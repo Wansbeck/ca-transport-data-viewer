@@ -1,6 +1,3 @@
-const AADT_SERVICE =
-  'https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/Traffic_AADT/FeatureServer/0/query';
-
 const map = new maplibregl.Map({
   container: 'map',
   style: {
@@ -24,7 +21,8 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
 map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'imperial' }));
 
-let allFeatures = [];
+let aadtFeatures = [];
+let truckFeatures = [];
 
 function num(value) {
   const cleaned = String(value ?? '').replace(/,/g, '').trim();
@@ -32,98 +30,37 @@ function num(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function maxAadt(properties) {
-  return Math.max(num(properties.BACK_AADT), num(properties.AHEAD_AADT));
-}
-
 function fmt(value) {
   const n = num(value);
   return n ? n.toLocaleString('en-US') : '—';
 }
 
-async function fetchAadtPage(offset) {
-  const params = new URLSearchParams({
-    where: '1=1',
-    outFields: '*',
-    returnGeometry: 'true',
-    outSR: '4326',
-    f: 'geojson',
-    resultOffset: String(offset),
-    resultRecordCount: '2000'
-  });
+function fmtPct(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+}
 
-  const response = await fetch(`${AADT_SERVICE}?${params.toString()}`);
-  if (!response.ok) throw new Error(`Caltrans request failed: ${response.status}`);
+function matchLabel(method) {
+  return method === 'exact'
+    ? 'Exact postmile'
+    : method === 'nearest_postmile'
+      ? 'Nearest postmile ≤0.03 mi'
+      : '—';
+}
+
+async function loadGeoJson(path) {
+  const response = await fetch(path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Failed to load ${path}: ${response.status}`);
   return response.json();
-}
-
-async function loadAllAadt() {
-  try {
-    const response = await fetch('data/aadt-2024.geojson', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`2024 local dataset failed: ${response.status}`);
-    const data = await response.json();
-    return {
-      features: data.features || [],
-      year: 2024,
-      source: 'official 2024 Caltrans census workbook'
-    };
-  } catch (error) {
-    console.warn('Falling back to live Caltrans GIS layer:', error);
-    const features = [];
-    let offset = 0;
-
-    while (true) {
-      const page = await fetchAadtPage(offset);
-      const batch = page.features || [];
-      features.push(...batch);
-      if (batch.length < 2000) break;
-      offset += batch.length;
-    }
-
-    return {
-      features: features.map(feature => ({
-        ...feature,
-        properties: {
-          ...feature.properties,
-          MAX_AADT: maxAadt(feature.properties),
-          YEAR: 2023,
-          MATCH_METHOD: 'live_gis_fallback'
-        }
-      })),
-      year: 2023,
-      source: 'live Caltrans GIS fallback'
-    };
-  }
-}
-
-function updateFilter() {
-  if (!map.getLayer('aadt-points')) return;
-
-  const route = document.getElementById('route').value;
-  const minimum = Number(document.getElementById('aadt').value);
-
-  const filters = [['>=', ['get', 'MAX_AADT'], minimum]];
-  if (route !== 'all') {
-    filters.push(['==', ['get', 'RTE'], route]);
-  }
-
-  map.setFilter('aadt-points', ['all', ...filters]);
-
-  const visible = allFeatures.filter(f => {
-    const routeOk = route === 'all' || String(f.properties.RTE) === route;
-    return routeOk && f.properties.MAX_AADT >= minimum;
-  }).length;
-
-  document.getElementById('aadt-value').textContent = minimum.toLocaleString('en-US');
-  document.getElementById('visible-count').textContent =
-    `${visible.toLocaleString('en-US')} count locations match the filter`;
 }
 
 function populateRoutes() {
   const routeSelect = document.getElementById('route');
-  const routes = [...new Set(allFeatures.map(f => String(f.properties.RTE || '').trim()))]
-    .filter(Boolean)
-    .sort((a, b) => Number(a) - Number(b));
+  const routes = [...new Set(
+    [...aadtFeatures, ...truckFeatures]
+      .map(f => String(f.properties.RTE || '').trim())
+      .filter(Boolean)
+  )].sort((a, b) => Number(a) - Number(b));
 
   routeSelect.innerHTML =
     '<option value="all">All routes</option>' +
@@ -132,45 +69,113 @@ function populateRoutes() {
   routeSelect.disabled = false;
 }
 
-function popupHtml(p) {
-  const route = Number(p.RTE);
-  const description = p.DESCRIPTION || 'Caltrans traffic count location';
+function updateFilters() {
+  const route = document.getElementById('route').value;
+  const minAadt = Number(document.getElementById('aadt').value);
+  const minTruckPct = Number(document.getElementById('truck-pct').value);
 
-  const matchLabel =
-    p.MATCH_METHOD === 'exact' ? 'Exact postmile' :
-    p.MATCH_METHOD === 'nearest_postmile' ? 'Nearest postmile ≤0.03 mi' :
-    p.MATCH_METHOD === 'live_gis_fallback' ? 'Live GIS fallback' : '—';
+  if (map.getLayer('aadt-points')) {
+    const filters = [['>=', ['get', 'MAX_AADT'], minAadt]];
+    if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
+    map.setFilter('aadt-points', ['all', ...filters]);
+  }
 
+  if (map.getLayer('truck-points')) {
+    const filters = [['>=', ['coalesce', ['get', 'TRUCK_PERCENT'], 0], minTruckPct]];
+    if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
+    map.setFilter('truck-points', ['all', ...filters]);
+  }
+
+  const visibleAadt = aadtFeatures.filter(f => {
+    const routeOk = route === 'all' || String(f.properties.RTE) === route;
+    return routeOk && num(f.properties.MAX_AADT) >= minAadt;
+  }).length;
+
+  const visibleTruck = truckFeatures.filter(f => {
+    const routeOk = route === 'all' || String(f.properties.RTE) === route;
+    return routeOk && num(f.properties.TRUCK_PERCENT) >= minTruckPct;
+  }).length;
+
+  document.getElementById('aadt-value').textContent = minAadt.toLocaleString('en-US');
+  document.getElementById('truck-pct-value').textContent = minTruckPct.toLocaleString('en-US');
+  document.getElementById('visible-count').textContent =
+    `${visibleAadt.toLocaleString('en-US')} AADT locations; ${visibleTruck.toLocaleString('en-US')} truck locations match the filters`;
+}
+
+function aadtPopup(p) {
   return `
-    <div class="popup-title">Route ${route}: ${description}</div>
+    <div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans traffic count location'}</div>
     <div class="popup-grid">
       <span>Data year</span><strong>${p.YEAR || '—'}</strong>
       <span>County</span><strong>${p.CNTY || '—'}</strong>
-      <span>Postmile</span><strong>${[p.PM_PFX, p.PM, p.PM_SFX].filter(Boolean).join('') || '—'}</strong>
+      <span>Postmile</span><strong>${p.PM ?? '—'}</strong>
       <span>Back AADT</span><strong>${fmt(p.BACK_AADT)}</strong>
       <span>Ahead AADT</span><strong>${fmt(p.AHEAD_AADT)}</strong>
       <span>Back peak hour</span><strong>${fmt(p.BACK_PEAK_HOUR)}</strong>
       <span>Ahead peak hour</span><strong>${fmt(p.AHEAD_PEAK_HOUR)}</strong>
-      <span>Location match</span><strong>${matchLabel}</strong>
+      <span>Location match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
     </div>
   `;
 }
 
+function truckPopup(p) {
+  return `
+    <div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans truck count location'}</div>
+    <div class="popup-grid">
+      <span>Data year</span><strong>${p.YEAR || '—'}</strong>
+      <span>County</span><strong>${p.CNTY || '—'}</strong>
+      <span>Postmile</span><strong>${p.PM ?? '—'}</strong>
+      <span>Total AADT</span><strong>${fmt(p.TOTAL_AADT)}</strong>
+      <span>Truck AADT</span><strong>${fmt(p.TRUCK_AADT)}</strong>
+      <span>Truck share</span><strong>${fmtPct(p.TRUCK_PERCENT)}</strong>
+      <span>2-axle trucks</span><strong>${fmt(p.TRK_2_AXLE)}</strong>
+      <span>3-axle trucks</span><strong>${fmt(p.TRK_3_AXLE)}</strong>
+      <span>4-axle trucks</span><strong>${fmt(p.TRK_4_AXLE)}</strong>
+      <span>5-axle trucks</span><strong>${fmt(p.TRK_5_AXLE)}</strong>
+      <span>Location match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
+    </div>
+  `;
+}
+
+function bindLayerPopup(layerId, htmlFn) {
+  map.on('click', layerId, e => {
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+    new maplibregl.Popup()
+      .setLngLat(feature.geometry.coordinates)
+      .setHTML(htmlFn(feature.properties))
+      .addTo(map);
+  });
+
+  map.on('mouseenter', layerId, () => {
+    map.getCanvas().style.cursor = 'pointer';
+  });
+
+  map.on('mouseleave', layerId, () => {
+    map.getCanvas().style.cursor = '';
+  });
+}
+
 map.on('load', async () => {
-  map.fitBounds(
-    [[-124.48, 32.52], [-114.13, 42.01]],
-    { padding: 36, duration: 0 }
-  );
+  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], {
+    padding: 36,
+    duration: 0
+  });
 
   const status = document.getElementById('status-message');
 
   try {
-    const dataset = await loadAllAadt();
-    allFeatures = dataset.features;
+    const [aadtData, truckData] = await Promise.all([
+      loadGeoJson('data/aadt-2024.geojson'),
+      loadGeoJson('data/truck-2024.geojson')
+    ]);
+
+    aadtFeatures = aadtData.features || [];
+    truckFeatures = truckData.features || [];
 
     map.addSource('aadt', {
       type: 'geojson',
-      data: { type: 'FeatureCollection', features: allFeatures }
+      data: { type: 'FeatureCollection', features: aadtFeatures }
     });
 
     map.addLayer({
@@ -199,43 +204,64 @@ map.on('load', async () => {
       }
     });
 
+    map.addSource('truck', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: truckFeatures }
+    });
+
+    map.addLayer({
+      id: 'truck-points',
+      type: 'circle',
+      source: 'truck',
+      layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': [
+          'interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0],
+          0, 3,
+          1000, 4,
+          5000, 6,
+          10000, 8,
+          25000, 11
+        ],
+        'circle-color': [
+          'step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0],
+          '#b9c7d8',
+          5, '#7ba0c7',
+          10, '#477aa8',
+          20, '#244c73'
+        ],
+        'circle-opacity': 0.82,
+        'circle-stroke-color': '#ffffff',
+        'circle-stroke-width': 0.8
+      }
+    });
+
     populateRoutes();
     document.getElementById('aadt').disabled = false;
-    updateFilter();
+    document.getElementById('truck-pct').disabled = false;
+    updateFilters();
+
+    bindLayerPopup('aadt-points', aadtPopup);
+    bindLayerPopup('truck-points', truckPopup);
 
     status.textContent =
-      `${allFeatures.length.toLocaleString('en-US')} Caltrans ${dataset.year} AADT count locations loaded from the ${dataset.source}.`;
-
-    map.on('click', 'aadt-points', e => {
-      const feature = e.features && e.features[0];
-      if (!feature) return;
-      new maplibregl.Popup()
-        .setLngLat(feature.geometry.coordinates)
-        .setHTML(popupHtml(feature.properties))
-        .addTo(map);
-    });
-
-    map.on('mouseenter', 'aadt-points', () => {
-      map.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.on('mouseleave', 'aadt-points', () => {
-      map.getCanvas().style.cursor = '';
-    });
+      `${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
   } catch (error) {
     console.error(error);
-    status.textContent =
-      'The Caltrans traffic layer could not be loaded. The base map is still available.';
+    status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
   }
 });
 
-document.getElementById('route').addEventListener('change', updateFilter);
-document.getElementById('aadt').addEventListener('input', updateFilter);
+document.getElementById('route').addEventListener('change', updateFilters);
+document.getElementById('aadt').addEventListener('input', updateFilters);
+document.getElementById('truck-pct').addEventListener('input', updateFilters);
+
 document.getElementById('aadt-layer').addEventListener('change', event => {
   if (!map.getLayer('aadt-points')) return;
-  map.setLayoutProperty(
-    'aadt-points',
-    'visibility',
-    event.target.checked ? 'visible' : 'none'
-  );
+  map.setLayoutProperty('aadt-points', 'visibility', event.target.checked ? 'visible' : 'none');
+});
+
+document.getElementById('truck-layer').addEventListener('change', event => {
+  if (!map.getLayer('truck-points')) return;
+  map.setLayoutProperty('truck-points', 'visibility', event.target.checked ? 'visible' : 'none');
 });
