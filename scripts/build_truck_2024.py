@@ -159,16 +159,19 @@ def main():
     output = []
 
     total_aadt_candidates = [
+        pick_col(norm_cols, "vehicle_aadt_total"),
         pick_col(norm_cols, "total_aadt"),
         pick_col(norm_cols, "vehicle_aadt"),
         pick_col(norm_cols, "aadt"),
     ]
     truck_aadt_candidates = [
+        pick_col(norm_cols, "tot_trk_aadt"),
         pick_col(norm_cols, "truck_aadt"),
         pick_col(norm_cols, "total_truck_aadt"),
         pick_col(norm_cols, "truck_adt"),
     ]
     truck_pct_candidates = [
+        pick_col(norm_cols, "trk_percent_tot"),
         pick_col(norm_cols, "truck_percent"),
         pick_col(norm_cols, "truck_pct"),
         pick_col(norm_cols, "percent_trucks"),
