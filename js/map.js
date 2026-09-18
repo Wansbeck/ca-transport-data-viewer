@@ -59,6 +59,38 @@ async function loadGeoJson(path) {
   return response.json();
 }
 
+async function dataFileExists(path) {
+  try {
+    const response = await fetch(path, { method: 'HEAD', cache: 'no-store' });
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function refreshOptionalLayerAvailability() {
+  const serviceCheckbox = document.getElementById('service-layer');
+  const opportunityCheckbox = document.getElementById('opportunity-layer');
+  const [serviceReady, opportunityReady] = await Promise.all([
+    dataFileExists('data/services-osm.geojson'),
+    dataFileExists('data/opportunity-2024.geojson')
+  ]);
+
+  serviceCheckbox.disabled = !serviceReady;
+  opportunityCheckbox.disabled = !opportunityReady;
+
+  if (!serviceReady) {
+    serviceCheckbox.title = 'Service dataset is still being built.';
+  } else {
+    serviceCheckbox.title = '';
+  }
+  if (!opportunityReady) {
+    opportunityCheckbox.title = 'Opportunity dataset is still being built.';
+  } else {
+    opportunityCheckbox.title = '';
+  }
+}
+
 function populateRoutes() {
   const routeSelect = document.getElementById('route');
   const routes = [...new Set(
@@ -406,6 +438,7 @@ map.on('load', async () => {
     bindLayerPopup('truck-points', truckPopup);
 
     status.textContent = `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
+    await refreshOptionalLayerAvailability();
   } catch (error) {
     console.error(error);
     status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
