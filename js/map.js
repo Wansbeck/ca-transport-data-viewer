@@ -23,6 +23,7 @@ map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'imperial' }))
 
 let aadtFeatures = [];
 let truckFeatures = [];
+let segmentFeatures = [];
 
 function num(value) {
   const cleaned = String(value ?? '').replace(/,/g, '').trim();
@@ -45,7 +46,11 @@ function matchLabel(method) {
     ? 'Exact postmile'
     : method === 'nearest_postmile'
       ? 'Nearest postmile ≤0.03 mi'
-      : '—';
+      : method === 'exact_pm_route'
+        ? 'Exact postmile-route geometry'
+        : method === 'route_county_fallback'
+          ? 'Route/county geometry fallback'
+          : '—';
 }
 
 async function loadGeoJson(path) {
@@ -57,7 +62,7 @@ async function loadGeoJson(path) {
 function populateRoutes() {
   const routeSelect = document.getElementById('route');
   const routes = [...new Set(
-    [...aadtFeatures, ...truckFeatures]
+    [...aadtFeatures, ...truckFeatures, ...segmentFeatures]
       .map(f => String(f.properties.RTE || '').trim())
       .filter(Boolean)
   )].sort((a, b) => Number(a) - Number(b));
@@ -74,6 +79,12 @@ function updateFilters() {
   const minAadt = Number(document.getElementById('aadt').value);
   const minTruckPct = Number(document.getElementById('truck-pct').value);
 
+  if (map.getLayer('traffic-segments')) {
+    const filters = [['>=', ['get', 'AADT'], minAadt]];
+    if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
+    map.setFilter('traffic-segments', ['all', ...filters]);
+  }
+
   if (map.getLayer('aadt-points')) {
     const filters = [['>=', ['get', 'MAX_AADT'], minAadt]];
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
@@ -85,6 +96,11 @@ function updateFilters() {
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
     map.setFilter('truck-points', ['all', ...filters]);
   }
+
+  const visibleSegments = segmentFeatures.filter(f => {
+    const routeOk = route === 'all' || String(f.properties.RTE) === route;
+    return routeOk && num(f.properties.AADT) >= minAadt;
+  }).length;
 
   const visibleAadt = aadtFeatures.filter(f => {
     const routeOk = route === 'all' || String(f.properties.RTE) === route;
@@ -99,7 +115,7 @@ function updateFilters() {
   document.getElementById('aadt-value').textContent = minAadt.toLocaleString('en-US');
   document.getElementById('truck-pct-value').textContent = minTruckPct.toLocaleString('en-US');
   document.getElementById('visible-count').textContent =
-    `${visibleAadt.toLocaleString('en-US')} AADT locations; ${visibleTruck.toLocaleString('en-US')} truck locations match the filters`;
+    `${visibleSegments.toLocaleString('en-US')} traffic segments; ${visibleAadt.toLocaleString('en-US')} AADT points; ${visibleTruck.toLocaleString('en-US')} truck points match the filters`;
 }
 
 function aadtPopup(p) {
@@ -137,12 +153,30 @@ function truckPopup(p) {
   `;
 }
 
+function segmentPopup(p) {
+  return `
+    <div class="popup-title">Route ${Number(p.RTE)} derived traffic segment</div>
+    <div class="popup-grid">
+      <span>Data year</span><strong>${p.YEAR || '—'}</strong>
+      <span>County</span><strong>${p.CNTY || '—'}</strong>
+      <span>Postmile range</span><strong>${p.START_PM ?? '—'}–${p.END_PM ?? '—'}</strong>
+      <span>Estimated AADT</span><strong>${fmt(p.AADT)}</strong>
+      <span>From</span><strong>${p.START_DESC || '—'}</strong>
+      <span>To</span><strong>${p.END_DESC || '—'}</strong>
+      <span>Geometry match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
+    </div>
+    <div class="source-note" style="margin:10px 0 0 0">
+      Derived analytical segment, not an official Caltrans segment-level AADT record.
+    </div>
+  `;
+}
+
 function bindLayerPopup(layerId, htmlFn) {
   map.on('click', layerId, e => {
     const feature = e.features && e.features[0];
     if (!feature) return;
     new maplibregl.Popup()
-      .setLngLat(feature.geometry.coordinates)
+      .setLngLat(e.lngLat)
       .setHTML(htmlFn(feature.properties))
       .addTo(map);
   });
@@ -165,13 +199,42 @@ map.on('load', async () => {
   const status = document.getElementById('status-message');
 
   try {
-    const [aadtData, truckData] = await Promise.all([
+    const [aadtData, truckData, segmentData] = await Promise.all([
       loadGeoJson('data/aadt-2024.geojson'),
-      loadGeoJson('data/truck-2024.geojson')
+      loadGeoJson('data/truck-2024.geojson'),
+      loadGeoJson('data/aadt-2024-segments.geojson')
     ]);
 
     aadtFeatures = aadtData.features || [];
     truckFeatures = truckData.features || [];
+    segmentFeatures = segmentData.features || [];
+
+    map.addSource('traffic-segments', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: segmentFeatures }
+    });
+
+    map.addLayer({
+      id: 'traffic-segments',
+      type: 'line',
+      source: 'traffic-segments',
+      paint: {
+        'line-color': [
+          'step', ['get', 'AADT'],
+          '#69b3a2',
+          25000, '#f0c05a',
+          75000, '#e8824f',
+          150000, '#b94040'
+        ],
+        'line-width': [
+          'interpolate', ['linear'], ['zoom'],
+          4, 2.0,
+          8, 4.0,
+          12, 7.0
+        ],
+        'line-opacity': 0.88
+      }
+    });
 
     map.addSource('aadt', {
       type: 'geojson',
@@ -182,6 +245,7 @@ map.on('load', async () => {
       id: 'aadt-points',
       type: 'circle',
       source: 'aadt',
+      layout: { visibility: 'none' },
       paint: {
         'circle-radius': [
           'interpolate', ['linear'], ['get', 'MAX_AADT'],
@@ -198,9 +262,9 @@ map.on('load', async () => {
           75000, '#e8824f',
           150000, '#b94040'
         ],
-        'circle-opacity': 0.78,
+        'circle-opacity': 0.82,
         'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.7
+        'circle-stroke-width': 0.8
       }
     });
 
@@ -241,11 +305,12 @@ map.on('load', async () => {
     document.getElementById('truck-pct').disabled = false;
     updateFilters();
 
+    bindLayerPopup('traffic-segments', segmentPopup);
     bindLayerPopup('aadt-points', aadtPopup);
     bindLayerPopup('truck-points', truckPopup);
 
     status.textContent =
-      `${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
+      `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
   } catch (error) {
     console.error(error);
     status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
@@ -255,6 +320,11 @@ map.on('load', async () => {
 document.getElementById('route').addEventListener('change', updateFilters);
 document.getElementById('aadt').addEventListener('input', updateFilters);
 document.getElementById('truck-pct').addEventListener('input', updateFilters);
+
+document.getElementById('segment-layer').addEventListener('change', event => {
+  if (!map.getLayer('traffic-segments')) return;
+  map.setLayoutProperty('traffic-segments', 'visibility', event.target.checked ? 'visible' : 'none');
+});
 
 document.getElementById('aadt-layer').addEventListener('change', event => {
   if (!map.getLayer('aadt-points')) return;
