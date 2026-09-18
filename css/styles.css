@@ -181,3 +181,20 @@ select {
 .density-3 { background: #78c679; }
 .density-4 { background: #31a354; }
 .density-5 { background: #006837; }
+
+
+.service-controls {
+  margin: 2px 0 10px 26px;
+}
+.service-subrow {
+  margin: 6px 0;
+  font-size: 13px;
+}
+.service-subrow input {
+  flex: 0 0 auto;
+}
+.svc-fuel { background: #8c6d31; }
+.svc-truck { background: #54278f; }
+.svc-rest { background: #31a354; }
+.svc-ev { background: #2b8cbe; }
+.svc-food { background: #de2d26; }
