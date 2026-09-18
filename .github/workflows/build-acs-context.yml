@@ -1,0 +1,37 @@
+name: Build ACS tract context
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/build_acs_context.py"
+      - ".github/workflows/build-acs-context.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install GIS and data tools
+        run: pip install pandas requests geopandas pyogrio shapely
+
+      - name: Build 2024 ACS tract context
+        run: python scripts/build_acs_context.py
+
+      - name: Commit generated context data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/acs-2024-tract-context.geojson data/acs-2024-tract-context-meta.json
+          git diff --cached --quiet || git commit -m "Generate 2024 ACS tract context"
+          git push
