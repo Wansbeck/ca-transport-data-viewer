@@ -40,7 +40,23 @@
         <input id="opportunity-score" type="range" min="0" max="100" step="5" value="60" disabled>
         <div class="range-value"><span id="opportunity-score-value">60</span>/100 minimum</div>
         <div class="source-note">
-          Screening model combining total traffic, competition quality, service scarcity, traveller/tourism context, interchange accessibility, household income, population density, and a smaller truck-share component.
+          Screening model focused on addressable long-distance travel demand, service gaps and competition quality. Dense major-urban cores are excluded; urban fringes are penalized.
+        </div>
+
+        <label class="control-row">
+          <input id="srra-layer" type="checkbox">
+          <span>Caltrans Safety Roadside Rest Areas</span>
+        </label>
+        <div class="source-note">
+          Official Caltrans SRRA locations. These are treated as partial substitutes for basic stopping needs, not direct commercial competitors.
+        </div>
+
+        <label class="control-row">
+          <input id="urban-layer" type="checkbox">
+          <span>Urban suitability areas</span>
+        </label>
+        <div class="source-note">
+          Census 2020 Urban Areas. Dense segments in major urban areas are excluded from opportunity scoring; lower-density urban locations are penalized.
         </div>
 
         <label class="control-row">
@@ -117,10 +133,22 @@
 
       <section class="legend">
         <h2>Opportunity score</h2>
+        <div><span class="line-swatch opp-excluded"></span> Urban core excluded</div>
         <div><span class="line-swatch opp-low"></span> Under 50</div>
         <div><span class="line-swatch opp-med"></span> 50–65</div>
         <div><span class="line-swatch opp-high"></span> 65–80</div>
         <div><span class="line-swatch opp-very-high"></span> 80+</div>
+      </section>
+
+      <section class="legend">
+        <h2>Caltrans SRRA</h2>
+        <div><span class="dot srra-dot"></span> Safety Roadside Rest Area</div>
+      </section>
+
+      <section class="legend">
+        <h2>Urban suitability</h2>
+        <div><span class="swatch urban-major"></span> Major urban area</div>
+        <div><span class="swatch urban-other"></span> Other urban area</div>
       </section>
 
       <section class="legend">
@@ -134,7 +162,7 @@
 
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.9</strong></p>
+        <p><strong>Version 1.0</strong></p>
         <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
