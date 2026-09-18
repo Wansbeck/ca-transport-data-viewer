@@ -160,3 +160,24 @@ select {
     border-bottom: 1px solid #d9dee3;
   }
 }
+
+
+.context-legend .swatch {
+  width: 18px;
+  height: 11px;
+  display: inline-block;
+  border: 1px solid rgba(0,0,0,.2);
+}
+
+.income-1 { background: #f1eef6; }
+.income-2 { background: #d7b5d8; }
+.income-3 { background: #df65b0; }
+.income-4 { background: #ce1256; }
+.income-5 { background: #980043; }
+.income-6 { background: #67001f; }
+
+.density-1 { background: #ffffcc; }
+.density-2 { background: #c2e699; }
+.density-3 { background: #78c679; }
+.density-4 { background: #31a354; }
+.density-5 { background: #006837; }
