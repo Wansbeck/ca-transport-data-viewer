@@ -1,0 +1,44 @@
+name: Build opportunity score
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build service competition data"]
+    types: [completed]
+  push:
+    paths:
+      - "scripts/build_opportunity_2024.py"
+      - ".github/workflows/build-opportunity-2024.yml"
+      - "data/aadt-2024-segments.geojson"
+      - "data/truck-2024.geojson"
+      - "data/acs-2024-tract-context.geojson"
+      - "data/services-osm.geojson"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install geopandas scipy
+      - name: Build opportunity layer
+        run: python scripts/build_opportunity_2024.py
+      - name: Commit opportunity data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/opportunity-2024.geojson data/opportunity-2024-meta.json
+          if git diff --cached --quiet; then
+            echo "No opportunity data changes to commit."
+          else
+            git commit -m "Refresh corridor opportunity scores"
+            git push
+          fi
