@@ -116,6 +116,11 @@ select {
 .dot-high { background: #e8824f; }
 .dot-very-high { background: #b94040; }
 
+.truck-low { background: #b9c7d8; }
+.truck-med { background: #7ba0c7; }
+.truck-high { background: #477aa8; }
+.truck-very-high { background: #244c73; }
+
 .map-wrap,
 #map {
   width: 100%;
@@ -124,7 +129,7 @@ select {
 
 .maplibregl-popup-content {
   font-family: Arial, Helvetica, sans-serif;
-  min-width: 240px;
+  min-width: 255px;
 }
 
 .popup-title {
