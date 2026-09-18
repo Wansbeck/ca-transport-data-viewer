@@ -58,24 +58,42 @@ async function fetchAadtPage(offset) {
 }
 
 async function loadAllAadt() {
-  const features = [];
-  let offset = 0;
+  try {
+    const response = await fetch('data/aadt-2024.geojson', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`2024 local dataset failed: ${response.status}`);
+    const data = await response.json();
+    return {
+      features: data.features || [],
+      year: 2024,
+      source: 'official 2024 Caltrans census workbook'
+    };
+  } catch (error) {
+    console.warn('Falling back to live Caltrans GIS layer:', error);
+    const features = [];
+    let offset = 0;
 
-  while (true) {
-    const page = await fetchAadtPage(offset);
-    const batch = page.features || [];
-    features.push(...batch);
-    if (batch.length < 2000) break;
-    offset += batch.length;
-  }
-
-  return features.map(feature => ({
-    ...feature,
-    properties: {
-      ...feature.properties,
-      MAX_AADT: maxAadt(feature.properties)
+    while (true) {
+      const page = await fetchAadtPage(offset);
+      const batch = page.features || [];
+      features.push(...batch);
+      if (batch.length < 2000) break;
+      offset += batch.length;
     }
-  }));
+
+    return {
+      features: features.map(feature => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          MAX_AADT: maxAadt(feature.properties),
+          YEAR: 2023,
+          MATCH_METHOD: 'live_gis_fallback'
+        }
+      })),
+      year: 2023,
+      source: 'live Caltrans GIS fallback'
+    };
+  }
 }
 
 function updateFilter() {
@@ -118,15 +136,22 @@ function popupHtml(p) {
   const route = Number(p.RTE);
   const description = p.DESCRIPTION || 'Caltrans traffic count location';
 
+  const matchLabel =
+    p.MATCH_METHOD === 'exact' ? 'Exact postmile' :
+    p.MATCH_METHOD === 'nearest_postmile' ? 'Nearest postmile ≤0.03 mi' :
+    p.MATCH_METHOD === 'live_gis_fallback' ? 'Live GIS fallback' : '—';
+
   return `
     <div class="popup-title">Route ${route}: ${description}</div>
     <div class="popup-grid">
+      <span>Data year</span><strong>${p.YEAR || '—'}</strong>
       <span>County</span><strong>${p.CNTY || '—'}</strong>
       <span>Postmile</span><strong>${[p.PM_PFX, p.PM, p.PM_SFX].filter(Boolean).join('') || '—'}</strong>
       <span>Back AADT</span><strong>${fmt(p.BACK_AADT)}</strong>
       <span>Ahead AADT</span><strong>${fmt(p.AHEAD_AADT)}</strong>
       <span>Back peak hour</span><strong>${fmt(p.BACK_PEAK_HOUR)}</strong>
       <span>Ahead peak hour</span><strong>${fmt(p.AHEAD_PEAK_HOUR)}</strong>
+      <span>Location match</span><strong>${matchLabel}</strong>
     </div>
   `;
 }
@@ -140,7 +165,8 @@ map.on('load', async () => {
   const status = document.getElementById('status-message');
 
   try {
-    allFeatures = await loadAllAadt();
+    const dataset = await loadAllAadt();
+    allFeatures = dataset.features;
 
     map.addSource('aadt', {
       type: 'geojson',
@@ -178,7 +204,7 @@ map.on('load', async () => {
     updateFilter();
 
     status.textContent =
-      `${allFeatures.length.toLocaleString('en-US')} Caltrans 2023 AADT count locations loaded from the live GIS service.`;
+      `${allFeatures.length.toLocaleString('en-US')} Caltrans ${dataset.year} AADT count locations loaded from the ${dataset.source}.`;
 
     map.on('click', 'aadt-points', e => {
       const feature = e.features && e.features[0];
