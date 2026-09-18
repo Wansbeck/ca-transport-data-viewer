@@ -47,19 +47,25 @@ def to_int(v):
     except Exception:
         return None
 
-def find_header_row(path):
-    preview = pd.read_excel(path, header=None, nrows=25)
-    for i, row in preview.iterrows():
-        vals = [clean_name(x) for x in row.tolist()]
-        joined = " ".join(vals)
-        has_route = "route" in joined
-        has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined)
-        has_county = "county" in joined or re.search(r"(^|_)co($|_)", joined) is not None
-        if has_route and has_postmile and has_county:
-            return i
-    print("Workbook preview:")
-    print(preview.to_string(index=True, header=False))
-    raise RuntimeError("Could not identify the workbook header row.")
+def find_sheet_and_header(path):
+    book = pd.ExcelFile(path)
+    print("Workbook sheets:", book.sheet_names)
+    for sheet in book.sheet_names:
+        preview = pd.read_excel(path, sheet_name=sheet, header=None, nrows=30)
+        if preview.empty:
+            continue
+        for i, row in preview.iterrows():
+            vals = [clean_name(x) for x in row.tolist()]
+            joined = " ".join(vals)
+            has_route = "route" in joined
+            has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined)
+            has_county = "county" in joined or re.search(r"(^|_)co($|_)", joined) is not None
+            if has_route and has_postmile and has_county:
+                print(f"Using sheet {sheet!r}, header row {i}")
+                return sheet, i
+        print(f"Preview for sheet {sheet!r}:")
+        print(preview.head(12).to_string(index=True, header=False))
+    raise RuntimeError("Could not identify the workbook data sheet/header row.")
 
 def find_col(columns, required_tokens, forbidden_tokens=()):
     for c in columns:
@@ -108,8 +114,8 @@ def main():
     xlsx = Path("/tmp/2024-aadt.xlsx")
     download_xlsx(xlsx)
 
-    header_row = find_header_row(xlsx)
-    df = pd.read_excel(xlsx, header=header_row)
+    sheet_name, header_row = find_sheet_and_header(xlsx)
+    df = pd.read_excel(xlsx, sheet_name=sheet_name, header=header_row)
     df = df.dropna(how="all")
     print("Workbook columns:", list(df.columns))
 
@@ -214,6 +220,7 @@ def main():
         "exact_matches": exact,
         "nearest_postmile_matches": nearest,
         "unmatched_rows": unmatched,
+        "sheet_name": sheet_name,
         "header_row": header_row,
         "columns": [str(c) for c in df.columns],
     }
