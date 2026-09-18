@@ -30,7 +30,12 @@ jobs:
       - name: Install dependencies
         run: pip install geopandas scipy
       - name: Build opportunity layer
-        run: python scripts/build_opportunity_2024.py
+        run: |
+          if [ ! -f data/services-osm.geojson ]; then
+            echo "Service dataset is not available yet; opportunity build will run after the service workflow completes."
+            exit 0
+          fi
+          python scripts/build_opportunity_2024.py
       - name: Commit opportunity data
         run: |
           git config user.name "github-actions[bot]"
