@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>California Highway Opportunity Explorer</title>
+  <link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>California Highway Opportunity Explorer</h1>
+        <p>Interactive highway traffic and service-area analysis.</p>
+      </div>
+
+      <section>
+        <h2>Layers</h2>
+        <label class="control-row">
+          <input type="checkbox" checked disabled>
+          <span>Base map</span>
+        </label>
+        <label class="control-row muted">
+          <input type="checkbox" disabled>
+          <span>2024 AADT</span>
+        </label>
+        <label class="control-row muted">
+          <input type="checkbox" disabled>
+          <span>2024 Truck AADT</span>
+        </label>
+        <label class="control-row muted">
+          <input type="checkbox" disabled>
+          <span>Traffic segments</span>
+        </label>
+      </section>
+
+      <section>
+        <h2>Filters</h2>
+        <label for="route">Route</label>
+        <select id="route" disabled>
+          <option>All routes</option>
+        </select>
+
+        <label for="aadt">Minimum AADT</label>
+        <input id="aadt" type="range" min="0" max="150000" value="0" disabled>
+        <div class="range-value">Traffic data coming next</div>
+      </section>
+
+      <section class="status">
+        <h2>Status</h2>
+        <p><strong>Version 0.1</strong></p>
+        <p>Base map working. Caltrans traffic layers will be added next.</p>
+      </section>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map" aria-label="Interactive map of California"></div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script>
+  <script src="js/map.js"></script>
+</body>
+</html>
