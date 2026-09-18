@@ -210,3 +210,21 @@ select {
 .opp-med { background: #fed976; }
 .opp-high { background: #fd8d3c; }
 .opp-very-high { background: #bd0026; }
+
+
+.control-row input:disabled + span {
+  color: #9aa3ad;
+}
+.control-row input:disabled {
+  cursor: not-allowed;
+}
+@media (max-width: 760px) {
+  .control-row {
+    min-height: 30px;
+  }
+  .control-row input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+}
