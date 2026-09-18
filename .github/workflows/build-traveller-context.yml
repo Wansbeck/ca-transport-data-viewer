@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - run: git pull --rebase origin main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -37,6 +38,5 @@ jobs:
             echo "No traveller context changes."
           else
             git commit -m "Refresh traveller context data"
-            git pull --rebase origin main
             git push origin HEAD:main
           fi
