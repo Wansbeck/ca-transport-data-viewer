@@ -52,8 +52,13 @@ def find_header_row(path):
     for i, row in preview.iterrows():
         vals = [clean_name(x) for x in row.tolist()]
         joined = " ".join(vals)
-        if "route" in joined and "county" in joined and ("postmile" in joined or "post_mile" in joined):
+        has_route = "route" in joined
+        has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined)
+        has_county = "county" in joined or re.search(r"(^|_)co($|_)", joined) is not None
+        if has_route and has_postmile and has_county:
             return i
+    print("Workbook preview:")
+    print(preview.to_string(index=True, header=False))
     raise RuntimeError("Could not identify the workbook header row.")
 
 def find_col(columns, required_tokens, forbidden_tokens=()):
