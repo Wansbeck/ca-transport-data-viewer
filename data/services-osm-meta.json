@@ -1,0 +1,24 @@
+{
+  "generated_at_utc": "2026-09-18T22:36:30.980132+00:00",
+  "source": "OpenStreetMap contributors via Overpass API",
+  "bbox": [
+    32.52,
+    -124.48,
+    42.01,
+    -114.13
+  ],
+  "feature_count": 13166,
+  "category_counts": {
+    "ev_charging": 3015,
+    "fuel": 9291,
+    "rest_area": 394,
+    "service_area": 63,
+    "truck_service": 403
+  },
+  "food_cluster_method": "0.05-degree grid; clusters require at least 3 named restaurant/fast_food/cafe/food_court POIs",
+  "notes": [
+    "OSM completeness and tagging vary by location.",
+    "Food clusters indicate nearby mapped venue concentration, not confirmed highway access.",
+    "Truck-oriented classification uses OSM HGV tags plus common truck-stop brand heuristics."
+  ]
+}
