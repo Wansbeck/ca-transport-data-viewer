@@ -25,10 +25,11 @@ let aadtFeatures = [];
 let truckFeatures = [];
 let segmentFeatures = [];
 let contextLoaded = false;
+let serviceLoaded = false;
+let serviceFeatures = [];
 
 function num(value) {
-  const cleaned = String(value ?? '').replace(/,/g, '').trim();
-  const parsed = Number(cleaned);
+  const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -43,15 +44,11 @@ function fmtPct(value) {
 }
 
 function matchLabel(method) {
-  return method === 'exact'
-    ? 'Exact postmile'
-    : method === 'nearest_postmile'
-      ? 'Nearest postmile ≤0.03 mi'
-      : method === 'exact_pm_route'
-        ? 'Exact postmile-route geometry'
-        : method === 'route_county_fallback'
-          ? 'Route/county geometry fallback'
-          : '—';
+  return method === 'exact' ? 'Exact postmile'
+    : method === 'nearest_postmile' ? 'Nearest postmile ≤0.03 mi'
+    : method === 'exact_pm_route' ? 'Exact postmile-route geometry'
+    : method === 'route_county_fallback' ? 'Route/county geometry fallback'
+    : '—';
 }
 
 async function loadGeoJson(path) {
@@ -71,7 +68,6 @@ function populateRoutes() {
   routeSelect.innerHTML =
     '<option value="all">All routes</option>' +
     routes.map(route => `<option value="${route}">Route ${Number(route)}</option>`).join('');
-
   routeSelect.disabled = false;
 }
 
@@ -85,33 +81,20 @@ function updateFilters() {
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
     map.setFilter('traffic-segments', ['all', ...filters]);
   }
-
   if (map.getLayer('aadt-points')) {
     const filters = [['>=', ['get', 'MAX_AADT'], minAadt]];
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
     map.setFilter('aadt-points', ['all', ...filters]);
   }
-
   if (map.getLayer('truck-points')) {
     const filters = [['>=', ['coalesce', ['get', 'TRUCK_PERCENT'], 0], minTruckPct]];
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
     map.setFilter('truck-points', ['all', ...filters]);
   }
 
-  const visibleSegments = segmentFeatures.filter(f => {
-    const routeOk = route === 'all' || String(f.properties.RTE) === route;
-    return routeOk && num(f.properties.AADT) >= minAadt;
-  }).length;
-
-  const visibleAadt = aadtFeatures.filter(f => {
-    const routeOk = route === 'all' || String(f.properties.RTE) === route;
-    return routeOk && num(f.properties.MAX_AADT) >= minAadt;
-  }).length;
-
-  const visibleTruck = truckFeatures.filter(f => {
-    const routeOk = route === 'all' || String(f.properties.RTE) === route;
-    return routeOk && num(f.properties.TRUCK_PERCENT) >= minTruckPct;
-  }).length;
+  const visibleSegments = segmentFeatures.filter(f => (route === 'all' || String(f.properties.RTE) === route) && num(f.properties.AADT) >= minAadt).length;
+  const visibleAadt = aadtFeatures.filter(f => (route === 'all' || String(f.properties.RTE) === route) && num(f.properties.MAX_AADT) >= minAadt).length;
+  const visibleTruck = truckFeatures.filter(f => (route === 'all' || String(f.properties.RTE) === route) && num(f.properties.TRUCK_PERCENT) >= minTruckPct).length;
 
   document.getElementById('aadt-value').textContent = minAadt.toLocaleString('en-US');
   document.getElementById('truck-pct-value').textContent = minTruckPct.toLocaleString('en-US');
@@ -120,8 +103,7 @@ function updateFilters() {
 }
 
 function aadtPopup(p) {
-  return `
-    <div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans traffic count location'}</div>
+  return `<div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans traffic count location'}</div>
     <div class="popup-grid">
       <span>Data year</span><strong>${p.YEAR || '—'}</strong>
       <span>County</span><strong>${p.CNTY || '—'}</strong>
@@ -131,13 +113,11 @@ function aadtPopup(p) {
       <span>Back peak hour</span><strong>${fmt(p.BACK_PEAK_HOUR)}</strong>
       <span>Ahead peak hour</span><strong>${fmt(p.AHEAD_PEAK_HOUR)}</strong>
       <span>Location match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
-    </div>
-  `;
+    </div>`;
 }
 
 function truckPopup(p) {
-  return `
-    <div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans truck count location'}</div>
+  return `<div class="popup-title">Route ${Number(p.RTE)}: ${p.DESCRIPTION || 'Caltrans truck count location'}</div>
     <div class="popup-grid">
       <span>Data year</span><strong>${p.YEAR || '—'}</strong>
       <span>County</span><strong>${p.CNTY || '—'}</strong>
@@ -150,13 +130,11 @@ function truckPopup(p) {
       <span>4-axle trucks</span><strong>${fmt(p.TRK_4_AXLE)}</strong>
       <span>5-axle trucks</span><strong>${fmt(p.TRK_5_AXLE)}</strong>
       <span>Location match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
-    </div>
-  `;
+    </div>`;
 }
 
 function segmentPopup(p) {
-  return `
-    <div class="popup-title">Route ${Number(p.RTE)} derived traffic segment</div>
+  return `<div class="popup-title">Route ${Number(p.RTE)} derived traffic segment</div>
     <div class="popup-grid">
       <span>Data year</span><strong>${p.YEAR || '—'}</strong>
       <span>County</span><strong>${p.CNTY || '—'}</strong>
@@ -166,496 +144,173 @@ function segmentPopup(p) {
       <span>To</span><strong>${p.END_DESC || '—'}</strong>
       <span>Geometry match</span><strong>${matchLabel(p.MATCH_METHOD)}</strong>
     </div>
-    <div class="source-note" style="margin:10px 0 0 0">
-      Derived analytical segment, not an official Caltrans segment-level AADT record.
-    </div>
-  `;
+    <div class="source-note" style="margin:10px 0 0 0">Derived analytical segment, not an official Caltrans segment-level AADT record.</div>`;
 }
 
 function contextPopup(p) {
-  return `
-    <div class="popup-title">Census tract ${p.NAME || p.GEOID || ''}</div>
+  return `<div class="popup-title">Census tract ${p.NAME || p.GEOID || ''}</div>
     <div class="popup-grid">
       <span>ACS vintage</span><strong>2024 5-year</strong>
-      <span>Median household income</span><strong>${p.MEDIAN_HH_INCOME == null ? '—' : '
-  map.on('click', layerId, e => {
-    const feature = e.features && e.features[0];
-    if (!feature) return;
-    new maplibregl.Popup()
-      .setLngLat(e.lngLat)
-      .setHTML(htmlFn(feature.properties))
-      .addTo(map);
-  });
-
-  map.on('mouseenter', layerId, () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-
-  map.on('mouseleave', layerId, () => {
-    map.getCanvas().style.cursor = '';
-  });
-}
-
-map.on('load', async () => {
-  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], {
-    padding: 36,
-    duration: 0
-  });
-
-  const status = document.getElementById('status-message');
-
-  try {
-    const [aadtData, truckData, segmentData] = await Promise.all([
-      loadGeoJson('data/aadt-2024.geojson'),
-      loadGeoJson('data/truck-2024.geojson'),
-      loadGeoJson('data/aadt-2024-segments.geojson')
-    ]);
-
-    aadtFeatures = aadtData.features || [];
-    truckFeatures = truckData.features || [];
-    segmentFeatures = segmentData.features || [];
-
-    map.addSource('traffic-segments', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: segmentFeatures }
-    });
-
-    map.addLayer({
-      id: 'traffic-segments',
-      type: 'line',
-      source: 'traffic-segments',
-      paint: {
-        'line-color': [
-          'step', ['get', 'AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          4, 2.0,
-          8, 4.0,
-          12, 7.0
-        ],
-        'line-opacity': 0.88
-      }
-    });
-
-    map.addSource('aadt', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: aadtFeatures }
-    });
-
-    map.addLayer({
-      id: 'aadt-points',
-      type: 'circle',
-      source: 'aadt',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['get', 'MAX_AADT'],
-          0, 3,
-          25000, 4,
-          75000, 6,
-          150000, 8,
-          300000, 11
-        ],
-        'circle-color': [
-          'step', ['get', 'MAX_AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
-      }
-    });
-
-    map.addSource('truck', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: truckFeatures }
-    });
-
-    map.addLayer({
-      id: 'truck-points',
-      type: 'circle',
-      source: 'truck',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0],
-          0, 3,
-          1000, 4,
-          5000, 6,
-          10000, 8,
-          25000, 11
-        ],
-        'circle-color': [
-          'step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0],
-          '#b9c7d8',
-          5, '#7ba0c7',
-          10, '#477aa8',
-          20, '#244c73'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
-      }
-    });
-
-    populateRoutes();
-    document.getElementById('aadt').disabled = false;
-    document.getElementById('truck-pct').disabled = false;
-    updateFilters();
-
-    bindLayerPopup('traffic-segments', segmentPopup);
-    bindLayerPopup('aadt-points', aadtPopup);
-    bindLayerPopup('truck-points', truckPopup);
-
-    status.textContent =
-      `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
-  } catch (error) {
-    console.error(error);
-    status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
-  }
-});
-
-document.getElementById('route').addEventListener('change', updateFilters);
-document.getElementById('aadt').addEventListener('input', updateFilters);
-document.getElementById('truck-pct').addEventListener('input', updateFilters);
-
-document.getElementById('segment-layer').addEventListener('change', event => {
-  if (!map.getLayer('traffic-segments')) return;
-  map.setLayoutProperty('traffic-segments', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-document.getElementById('aadt-layer').addEventListener('change', event => {
-  if (!map.getLayer('aadt-points')) return;
-  map.setLayoutProperty('aadt-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-document.getElementById('truck-layer').addEventListener('change', event => {
-  if (!map.getLayer('truck-points')) return;
-  map.setLayoutProperty('truck-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
- + Number(p.MEDIAN_HH_INCOME).toLocaleString('en-US')}</strong>
-      <span>Income MOE</span><strong>${p.MEDIAN_HH_INCOME_MOE == null ? '—' : '±
-  map.on('click', layerId, e => {
-    const feature = e.features && e.features[0];
-    if (!feature) return;
-    new maplibregl.Popup()
-      .setLngLat(e.lngLat)
-      .setHTML(htmlFn(feature.properties))
-      .addTo(map);
-  });
-
-  map.on('mouseenter', layerId, () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
-
-  map.on('mouseleave', layerId, () => {
-    map.getCanvas().style.cursor = '';
-  });
-}
-
-map.on('load', async () => {
-  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], {
-    padding: 36,
-    duration: 0
-  });
-
-  const status = document.getElementById('status-message');
-
-  try {
-    const [aadtData, truckData, segmentData] = await Promise.all([
-      loadGeoJson('data/aadt-2024.geojson'),
-      loadGeoJson('data/truck-2024.geojson'),
-      loadGeoJson('data/aadt-2024-segments.geojson')
-    ]);
-
-    aadtFeatures = aadtData.features || [];
-    truckFeatures = truckData.features || [];
-    segmentFeatures = segmentData.features || [];
-
-    map.addSource('traffic-segments', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: segmentFeatures }
-    });
-
-    map.addLayer({
-      id: 'traffic-segments',
-      type: 'line',
-      source: 'traffic-segments',
-      paint: {
-        'line-color': [
-          'step', ['get', 'AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          4, 2.0,
-          8, 4.0,
-          12, 7.0
-        ],
-        'line-opacity': 0.88
-      }
-    });
-
-    map.addSource('aadt', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: aadtFeatures }
-    });
-
-    map.addLayer({
-      id: 'aadt-points',
-      type: 'circle',
-      source: 'aadt',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['get', 'MAX_AADT'],
-          0, 3,
-          25000, 4,
-          75000, 6,
-          150000, 8,
-          300000, 11
-        ],
-        'circle-color': [
-          'step', ['get', 'MAX_AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
-      }
-    });
-
-    map.addSource('truck', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: truckFeatures }
-    });
-
-    map.addLayer({
-      id: 'truck-points',
-      type: 'circle',
-      source: 'truck',
-      layout: { visibility: 'none' },
-      paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0],
-          0, 3,
-          1000, 4,
-          5000, 6,
-          10000, 8,
-          25000, 11
-        ],
-        'circle-color': [
-          'step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0],
-          '#b9c7d8',
-          5, '#7ba0c7',
-          10, '#477aa8',
-          20, '#244c73'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
-      }
-    });
-
-    populateRoutes();
-    document.getElementById('aadt').disabled = false;
-    document.getElementById('truck-pct').disabled = false;
-    updateFilters();
-
-    bindLayerPopup('traffic-segments', segmentPopup);
-    bindLayerPopup('aadt-points', aadtPopup);
-    bindLayerPopup('truck-points', truckPopup);
-
-    status.textContent =
-      `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
-  } catch (error) {
-    console.error(error);
-    status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
-  }
-});
-
-document.getElementById('route').addEventListener('change', updateFilters);
-document.getElementById('aadt').addEventListener('input', updateFilters);
-document.getElementById('truck-pct').addEventListener('input', updateFilters);
-
-document.getElementById('segment-layer').addEventListener('change', event => {
-  if (!map.getLayer('traffic-segments')) return;
-  map.setLayoutProperty('traffic-segments', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-document.getElementById('aadt-layer').addEventListener('change', event => {
-  if (!map.getLayer('aadt-points')) return;
-  map.setLayoutProperty('aadt-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-document.getElementById('truck-layer').addEventListener('change', event => {
-  if (!map.getLayer('truck-points')) return;
-  map.setLayoutProperty('truck-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
- + Number(p.MEDIAN_HH_INCOME_MOE).toLocaleString('en-US')}</strong>
+      <span>Median household income</span><strong>${p.MEDIAN_HH_INCOME == null ? '—' : '$' + Number(p.MEDIAN_HH_INCOME).toLocaleString('en-US')}</strong>
+      <span>Income MOE</span><strong>${p.MEDIAN_HH_INCOME_MOE == null ? '—' : '±$' + Number(p.MEDIAN_HH_INCOME_MOE).toLocaleString('en-US')}</strong>
       <span>Population</span><strong>${fmt(p.POPULATION)}</strong>
       <span>Population density</span><strong>${p.POP_DENSITY_SQMI == null ? '—' : Number(p.POP_DENSITY_SQMI).toLocaleString('en-US') + '/sq mi'}</strong>
     </div>
-    <div class="source-note" style="margin:10px 0 0 0">
-      American Community Survey estimate; margins of error apply.
+    <div class="source-note" style="margin:10px 0 0 0">American Community Survey estimate; margins of error apply.</div>`;
+}
+
+const serviceLabels = {
+  fuel: 'Fuel station',
+  truck_service: 'Truck-oriented service',
+  service_area: 'Service area',
+  rest_area: 'Rest area',
+  ev_charging: 'EV charging',
+  food_cluster: 'Food cluster'
+};
+
+function servicePopup(p) {
+  if (p.CATEGORY === 'food_cluster') {
+    return `<div class="popup-title">${p.NAME || 'Mapped food cluster'}</div>
+      <div class="popup-grid">
+        <span>Restaurants</span><strong>${fmt(p.RESTAURANTS)}</strong>
+        <span>Fast food</span><strong>${fmt(p.FAST_FOOD)}</strong>
+        <span>Cafés</span><strong>${fmt(p.CAFES)}</strong>
+        <span>Sample venues</span><strong>${p.SAMPLE_NAMES || '—'}</strong>
+      </div>
+      <div class="source-note" style="margin:10px 0 0 0">OpenStreetMap venue cluster; this does not confirm direct highway access.</div>`;
+  }
+  return `<div class="popup-title">${p.NAME || serviceLabels[p.CATEGORY] || 'Service location'}</div>
+    <div class="popup-grid">
+      <span>Category</span><strong>${serviceLabels[p.CATEGORY] || p.CATEGORY || '—'}</strong>
+      <span>Brand</span><strong>${p.BRAND || '—'}</strong>
+      <span>Operator</span><strong>${p.OPERATOR || '—'}</strong>
+      <span>HGV access</span><strong>${p.HGV || '—'}</strong>
+      <span>Toilets</span><strong>${p.TOILETS || '—'}</strong>
+      <span>Showers</span><strong>${p.SHOWER || '—'}</strong>
+      <span>Hours</span><strong>${p.OPENING_HOURS || '—'}</strong>
     </div>
-  `;
-}
-
-function incomeColorExpression() {
-  return [
-    'case',
-    ['step', ['coalesce', ['get', 'MEDIAN_HH_INCOME'], -1],
-      '#d9d9d9',
-      0, '#f1eef6',
-      50000, '#d7b5d8',
-      75000, '#df65b0',
-      100000, '#ce1256',
-      150000, '#980043',
-      200000, '#67001f'
-    ]
-  ];
-}
-
-function densityColorExpression() {
-  return [
-    'case',
-    ['step', ['coalesce', ['get', 'POP_DENSITY_SQMI'], -1],
-      '#d9d9d9',
-      0, '#ffffcc',
-      100, '#c2e699',
-      500, '#78c679',
-      2000, '#31a354',
-      5000, '#006837'
-    ]
-  ];
-}
-
-function updateContextLegend() {
-  const metric = document.getElementById('context-metric').value;
-  const title = document.getElementById('context-legend-title');
-  const rows = document.getElementById('context-legend-rows');
-
-  if (metric === 'density') {
-    title.textContent = 'Population density';
-    rows.innerHTML = `
-      <div><span class="swatch density-1"></span> Under 100/sq mi</div>
-      <div><span class="swatch density-2"></span> 100–500/sq mi</div>
-      <div><span class="swatch density-3"></span> 500–2,000/sq mi</div>
-      <div><span class="swatch density-4"></span> 2,000–5,000/sq mi</div>
-      <div><span class="swatch density-5"></span> 5,000+/sq mi</div>
-    `;
-  } else {
-    title.textContent = 'Median household income';
-    rows.innerHTML = `
-      <div><span class="swatch income-1"></span> Under $50k</div>
-      <div><span class="swatch income-2"></span> $50k–$75k</div>
-      <div><span class="swatch income-3"></span> $75k–$100k</div>
-      <div><span class="swatch income-4"></span> $100k–$150k</div>
-      <div><span class="swatch income-5"></span> $150k–$200k</div>
-      <div><span class="swatch income-6"></span> $200k+</div>
-    `;
-  }
-
-  if (map.getLayer('acs-context-fill')) {
-    map.setPaintProperty(
-      'acs-context-fill',
-      'fill-color',
-      metric === 'density' ? densityColorExpression() : incomeColorExpression()
-    );
-  }
-}
-
-async function ensureContextLayer() {
-  if (contextLoaded) return;
-
-  const data = await loadGeoJson('data/acs-2024-tract-context.geojson');
-
-  map.addSource('acs-context', {
-    type: 'geojson',
-    data
-  });
-
-  map.addLayer({
-    id: 'acs-context-fill',
-    type: 'fill',
-    source: 'acs-context',
-    layout: { visibility: 'none' },
-    paint: {
-      'fill-color': incomeColorExpression(),
-      'fill-opacity': 0.42
-    }
-  }, 'traffic-segments');
-
-  map.addLayer({
-    id: 'acs-context-outline',
-    type: 'line',
-    source: 'acs-context',
-    layout: { visibility: 'none' },
-    paint: {
-      'line-color': '#ffffff',
-      'line-opacity': 0.28,
-      'line-width': 0.5
-    }
-  }, 'traffic-segments');
-
-  map.on('click', 'acs-context-fill', e => {
-    const blocking = map.queryRenderedFeatures(e.point, {
-      layers: ['traffic-segments', 'aadt-points', 'truck-points'].filter(id => map.getLayer(id))
-    });
-    if (blocking.length) return;
-
-    const feature = e.features && e.features[0];
-    if (!feature) return;
-
-    new maplibregl.Popup()
-      .setLngLat(e.lngLat)
-      .setHTML(contextPopup(feature.properties))
-      .addTo(map);
-  });
-
-  contextLoaded = true;
+    <div class="source-note" style="margin:10px 0 0 0">OpenStreetMap record; completeness and tagging vary.</div>`;
 }
 
 function bindLayerPopup(layerId, htmlFn) {
   map.on('click', layerId, e => {
     const feature = e.features && e.features[0];
     if (!feature) return;
-    new maplibregl.Popup()
-      .setLngLat(e.lngLat)
-      .setHTML(htmlFn(feature.properties))
-      .addTo(map);
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(htmlFn(feature.properties)).addTo(map);
   });
+  map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+}
 
-  map.on('mouseenter', layerId, () => {
-    map.getCanvas().style.cursor = 'pointer';
-  });
+function incomeColorExpression() {
+  return ['step', ['coalesce', ['get', 'MEDIAN_HH_INCOME'], -1],
+    '#d9d9d9', 0, '#f1eef6', 50000, '#d7b5d8', 75000, '#df65b0',
+    100000, '#ce1256', 150000, '#980043', 200000, '#67001f'];
+}
 
-  map.on('mouseleave', layerId, () => {
-    map.getCanvas().style.cursor = '';
+function densityColorExpression() {
+  return ['step', ['coalesce', ['get', 'POP_DENSITY_SQMI'], -1],
+    '#d9d9d9', 0, '#ffffcc', 100, '#c2e699', 500, '#78c679',
+    2000, '#31a354', 5000, '#006837'];
+}
+
+function updateContextLegend() {
+  const metric = document.getElementById('context-metric').value;
+  const title = document.getElementById('context-legend-title');
+  const rows = document.getElementById('context-legend-rows');
+  if (metric === 'density') {
+    title.textContent = 'Population density';
+    rows.innerHTML = '<div><span class="swatch density-1"></span> Under 100/sq mi</div><div><span class="swatch density-2"></span> 100–500/sq mi</div><div><span class="swatch density-3"></span> 500–2,000/sq mi</div><div><span class="swatch density-4"></span> 2,000–5,000/sq mi</div><div><span class="swatch density-5"></span> 5,000+/sq mi</div>';
+  } else {
+    title.textContent = 'Median household income';
+    rows.innerHTML = '<div><span class="swatch income-1"></span> Under $50k</div><div><span class="swatch income-2"></span> $50k–$75k</div><div><span class="swatch income-3"></span> $75k–$100k</div><div><span class="swatch income-4"></span> $100k–$150k</div><div><span class="swatch income-5"></span> $150k–$200k</div><div><span class="swatch income-6"></span> $200k+</div>';
+  }
+  if (map.getLayer('acs-context-fill')) {
+    map.setPaintProperty('acs-context-fill', 'fill-color', metric === 'density' ? densityColorExpression() : incomeColorExpression());
+  }
+}
+
+async function ensureContextLayer() {
+  if (contextLoaded) return;
+  const data = await loadGeoJson('data/acs-2024-tract-context.geojson');
+  map.addSource('acs-context', { type: 'geojson', data });
+  map.addLayer({
+    id: 'acs-context-fill', type: 'fill', source: 'acs-context',
+    layout: { visibility: 'none' },
+    paint: { 'fill-color': incomeColorExpression(), 'fill-opacity': 0.42 }
+  }, 'traffic-segments');
+  map.addLayer({
+    id: 'acs-context-outline', type: 'line', source: 'acs-context',
+    layout: { visibility: 'none' },
+    paint: { 'line-color': '#ffffff', 'line-opacity': 0.28, 'line-width': 0.5 }
+  }, 'traffic-segments');
+
+  map.on('click', 'acs-context-fill', e => {
+    const blocking = map.queryRenderedFeatures(e.point, {
+      layers: ['traffic-segments', 'aadt-points', 'truck-points', 'service-points'].filter(id => map.getLayer(id))
+    });
+    if (blocking.length) return;
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(contextPopup(feature.properties)).addTo(map);
   });
+  contextLoaded = true;
+}
+
+function selectedServiceCategories() {
+  return [...document.querySelectorAll('.service-category:checked')].map(el => el.value);
+}
+
+function updateServiceFilter() {
+  if (!map.getLayer('service-points')) return;
+  const categories = selectedServiceCategories();
+  map.setFilter('service-points', categories.length
+    ? ['in', ['get', 'CATEGORY'], ['literal', categories]]
+    : ['==', ['get', 'CATEGORY'], '__none__']);
+}
+
+async function ensureServiceLayer() {
+  if (serviceLoaded) return;
+  const data = await loadGeoJson('data/services-osm.geojson');
+  serviceFeatures = data.features || [];
+  map.addSource('services', { type: 'geojson', data });
+  map.addLayer({
+    id: 'service-points',
+    type: 'circle',
+    source: 'services',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'match', ['get', 'CATEGORY'],
+        'food_cluster', ['interpolate', ['linear'], ['coalesce', ['get', 'COUNT'], 3], 3, 4, 10, 7, 30, 11],
+        'truck_service', 7,
+        'service_area', 6,
+        'rest_area', 6,
+        'ev_charging', 5,
+        5
+      ],
+      'circle-color': [
+        'match', ['get', 'CATEGORY'],
+        'fuel', '#8c6d31',
+        'truck_service', '#54278f',
+        'service_area', '#756bb1',
+        'rest_area', '#31a354',
+        'ev_charging', '#2b8cbe',
+        'food_cluster', '#de2d26',
+        '#636363'
+      ],
+      'circle-opacity': 0.82,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 0.8
+    }
+  });
+  bindLayerPopup('service-points', servicePopup);
+  updateServiceFilter();
+  serviceLoaded = true;
 }
 
 map.on('load', async () => {
-  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], {
-    padding: 36,
-    duration: 0
-  });
-
+  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], { padding: 36, duration: 0 });
   const status = document.getElementById('status-message');
 
   try {
@@ -664,99 +319,37 @@ map.on('load', async () => {
       loadGeoJson('data/truck-2024.geojson'),
       loadGeoJson('data/aadt-2024-segments.geojson')
     ]);
-
     aadtFeatures = aadtData.features || [];
     truckFeatures = truckData.features || [];
     segmentFeatures = segmentData.features || [];
 
-    map.addSource('traffic-segments', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: segmentFeatures }
-    });
-
+    map.addSource('traffic-segments', { type: 'geojson', data: { type: 'FeatureCollection', features: segmentFeatures } });
     map.addLayer({
-      id: 'traffic-segments',
-      type: 'line',
-      source: 'traffic-segments',
+      id: 'traffic-segments', type: 'line', source: 'traffic-segments',
       paint: {
-        'line-color': [
-          'step', ['get', 'AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'line-width': [
-          'interpolate', ['linear'], ['zoom'],
-          4, 2.0,
-          8, 4.0,
-          12, 7.0
-        ],
+        'line-color': ['step', ['get', 'AADT'], '#69b3a2', 25000, '#f0c05a', 75000, '#e8824f', 150000, '#b94040'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 2.0, 8, 4.0, 12, 7.0],
         'line-opacity': 0.88
       }
     });
 
-    map.addSource('aadt', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: aadtFeatures }
-    });
-
+    map.addSource('aadt', { type: 'geojson', data: { type: 'FeatureCollection', features: aadtFeatures } });
     map.addLayer({
-      id: 'aadt-points',
-      type: 'circle',
-      source: 'aadt',
-      layout: { visibility: 'none' },
+      id: 'aadt-points', type: 'circle', source: 'aadt', layout: { visibility: 'none' },
       paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['get', 'MAX_AADT'],
-          0, 3,
-          25000, 4,
-          75000, 6,
-          150000, 8,
-          300000, 11
-        ],
-        'circle-color': [
-          'step', ['get', 'MAX_AADT'],
-          '#69b3a2',
-          25000, '#f0c05a',
-          75000, '#e8824f',
-          150000, '#b94040'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
+        'circle-radius': ['interpolate', ['linear'], ['get', 'MAX_AADT'], 0, 3, 25000, 4, 75000, 6, 150000, 8, 300000, 11],
+        'circle-color': ['step', ['get', 'MAX_AADT'], '#69b3a2', 25000, '#f0c05a', 75000, '#e8824f', 150000, '#b94040'],
+        'circle-opacity': 0.82, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8
       }
     });
 
-    map.addSource('truck', {
-      type: 'geojson',
-      data: { type: 'FeatureCollection', features: truckFeatures }
-    });
-
+    map.addSource('truck', { type: 'geojson', data: { type: 'FeatureCollection', features: truckFeatures } });
     map.addLayer({
-      id: 'truck-points',
-      type: 'circle',
-      source: 'truck',
-      layout: { visibility: 'none' },
+      id: 'truck-points', type: 'circle', source: 'truck', layout: { visibility: 'none' },
       paint: {
-        'circle-radius': [
-          'interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0],
-          0, 3,
-          1000, 4,
-          5000, 6,
-          10000, 8,
-          25000, 11
-        ],
-        'circle-color': [
-          'step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0],
-          '#b9c7d8',
-          5, '#7ba0c7',
-          10, '#477aa8',
-          20, '#244c73'
-        ],
-        'circle-opacity': 0.82,
-        'circle-stroke-color': '#ffffff',
-        'circle-stroke-width': 0.8
+        'circle-radius': ['interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0], 0, 3, 1000, 4, 5000, 6, 10000, 8, 25000, 11],
+        'circle-color': ['step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0], '#b9c7d8', 5, '#7ba0c7', 10, '#477aa8', 20, '#244c73'],
+        'circle-opacity': 0.82, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8
       }
     });
 
@@ -764,13 +357,11 @@ map.on('load', async () => {
     document.getElementById('aadt').disabled = false;
     document.getElementById('truck-pct').disabled = false;
     updateFilters();
-
     bindLayerPopup('traffic-segments', segmentPopup);
     bindLayerPopup('aadt-points', aadtPopup);
     bindLayerPopup('truck-points', truckPopup);
 
-    status.textContent =
-      `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
+    status.textContent = `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
   } catch (error) {
     console.error(error);
     status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
@@ -781,41 +372,55 @@ document.getElementById('route').addEventListener('change', updateFilters);
 document.getElementById('aadt').addEventListener('input', updateFilters);
 document.getElementById('truck-pct').addEventListener('input', updateFilters);
 
-document.getElementById('segment-layer').addEventListener('change', event => {
-  if (!map.getLayer('traffic-segments')) return;
-  map.setLayoutProperty('traffic-segments', 'visibility', event.target.checked ? 'visible' : 'none');
+document.getElementById('segment-layer').addEventListener('change', e => {
+  if (map.getLayer('traffic-segments')) map.setLayoutProperty('traffic-segments', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+document.getElementById('aadt-layer').addEventListener('change', e => {
+  if (map.getLayer('aadt-points')) map.setLayoutProperty('aadt-points', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+document.getElementById('truck-layer').addEventListener('change', e => {
+  if (map.getLayer('truck-points')) map.setLayoutProperty('truck-points', 'visibility', e.target.checked ? 'visible' : 'none');
 });
 
-document.getElementById('aadt-layer').addEventListener('change', event => {
-  if (!map.getLayer('aadt-points')) return;
-  map.setLayoutProperty('aadt-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-document.getElementById('truck-layer').addEventListener('change', event => {
-  if (!map.getLayer('truck-points')) return;
-  map.setLayoutProperty('truck-points', 'visibility', event.target.checked ? 'visible' : 'none');
-});
-
-
-document.getElementById('context-layer').addEventListener('change', async event => {
+document.getElementById('service-layer').addEventListener('change', async e => {
   const status = document.getElementById('status-message');
   try {
-    if (event.target.checked) {
+    if (e.target.checked) {
+      status.textContent = 'Loading service and competition data…';
+      await ensureServiceLayer();
+      map.setLayoutProperty('service-points', 'visibility', 'visible');
+      updateServiceFilter();
+      status.textContent = `${serviceFeatures.length.toLocaleString('en-US')} service / competition features loaded from OpenStreetMap.`;
+    } else if (serviceLoaded) {
+      map.setLayoutProperty('service-points', 'visibility', 'none');
+    }
+  } catch (error) {
+    console.error(error);
+    e.target.checked = false;
+    status.textContent = 'Service data is not available yet. The data-build workflow may still be running.';
+  }
+});
+
+document.querySelectorAll('.service-category').forEach(el => el.addEventListener('change', updateServiceFilter));
+
+document.getElementById('context-layer').addEventListener('change', async e => {
+  const status = document.getElementById('status-message');
+  try {
+    if (e.target.checked) {
       status.textContent = 'Loading 2024 ACS tract context…';
       await ensureContextLayer();
       map.setLayoutProperty('acs-context-fill', 'visibility', 'visible');
       map.setLayoutProperty('acs-context-outline', 'visibility', 'visible');
       updateContextLegend();
-      status.textContent = `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} AADT points, ${truckFeatures.length.toLocaleString('en-US')} truck points, and 2024 ACS tract context available.`;
+      status.textContent = '2024 ACS tract context loaded.';
     } else if (contextLoaded) {
       map.setLayoutProperty('acs-context-fill', 'visibility', 'none');
       map.setLayoutProperty('acs-context-outline', 'visibility', 'none');
     }
   } catch (error) {
     console.error(error);
-    event.target.checked = false;
+    e.target.checked = false;
     status.textContent = 'The ACS context layer could not be loaded.';
   }
 });
-
 document.getElementById('context-metric').addEventListener('change', updateContextLegend);
