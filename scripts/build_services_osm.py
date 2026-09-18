@@ -112,6 +112,39 @@ def service_category(tags: dict) -> str:
     return "other"
 
 
+def competition_strength(category: str, tags: dict) -> tuple[float, str]:
+    """Approximate how strongly a location competes with a destination service concept."""
+    if category == "service_area":
+        return 3.0, "destination-scale"
+    if category == "truck_service":
+        strength = 2.2
+        if tags.get("shower") == "yes":
+            strength += 0.2
+        if tags.get("toilets") == "yes":
+            strength += 0.2
+        return min(strength, 2.8), "full-service"
+    if category == "rest_area":
+        return 1.2, "basic-stop"
+    if category == "fuel":
+        strength = 0.8
+        if tags.get("shop") in ("yes", "convenience"):
+            strength += 0.25
+        if tags.get("toilets") == "yes":
+            strength += 0.2
+        if tags.get("opening_hours") == "24/7":
+            strength += 0.15
+        return min(strength, 1.5), "fuel-convenience"
+    if category == "ev_charging":
+        capacity = clean_text(tags.get("capacity"))
+        try:
+            cap = int(float(capacity)) if capacity else 0
+        except ValueError:
+            cap = 0
+        strength = 0.45 + min(cap, 20) * 0.025
+        return min(strength, 0.95), "charging"
+    return 0.5, "other"
+
+
 def element_feature(element: dict) -> dict | None:
     xy = coords(element)
     if not xy:
@@ -121,8 +154,11 @@ def element_feature(element: dict) -> dict | None:
     if category == "other":
         return None
 
+    strength, quality_tier = competition_strength(category, tags)
     props = {
         "CATEGORY": category,
+        "COMPETITION_STRENGTH": round(strength, 2),
+        "QUALITY_TIER": quality_tier,
         "NAME": clean_text(tags.get("name") or tags.get("brand") or tags.get("operator")),
         "BRAND": clean_text(tags.get("brand")),
         "OPERATOR": clean_text(tags.get("operator")),
@@ -182,6 +218,8 @@ def build_food_clusters(elements: list[dict]) -> list[dict]:
                 "CAFES": types.get("cafe", 0),
                 "FOOD_COURTS": types.get("food_court", 0),
                 "SAMPLE_NAMES": ", ".join(sample_names) if sample_names else None,
+                "COMPETITION_STRENGTH": round(min(0.5 + len(items) * 0.08, 2.4), 2),
+                "QUALITY_TIER": "food-cluster",
             },
         })
 
@@ -239,6 +277,7 @@ def main():
         "notes": [
             "OSM completeness and tagging vary by location.",
             "Food clusters indicate nearby mapped venue concentration, not confirmed highway access.",
+            "Competition strength distinguishes basic fuel/charging/rest stops from stronger destination-scale service alternatives.",
             "Truck-oriented classification uses OSM HGV tags plus common truck-stop brand heuristics.",
         ],
     }
