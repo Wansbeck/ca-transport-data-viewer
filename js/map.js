@@ -27,6 +27,8 @@ let segmentFeatures = [];
 let contextLoaded = false;
 let serviceLoaded = false;
 let serviceFeatures = [];
+let opportunityLoaded = false;
+let opportunityFeatures = [];
 
 function num(value) {
   const parsed = Number(String(value ?? '').replace(/,/g, '').trim());
@@ -90,6 +92,13 @@ function updateFilters() {
     const filters = [['>=', ['coalesce', ['get', 'TRUCK_PERCENT'], 0], minTruckPct]];
     if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
     map.setFilter('truck-points', ['all', ...filters]);
+  }
+
+  if (map.getLayer('opportunity-segments')) {
+    const minOpportunity = Number(document.getElementById('opportunity-score').value);
+    const filters = [['>=', ['get', 'OPPORTUNITY_SCORE'], minOpportunity]];
+    if (route !== 'all') filters.push(['==', ['get', 'RTE'], route]);
+    map.setFilter('opportunity-segments', ['all', ...filters]);
   }
 
   const visibleSegments = segmentFeatures.filter(f => (route === 'all' || String(f.properties.RTE) === route) && num(f.properties.AADT) >= minAadt).length;
@@ -190,6 +199,311 @@ function servicePopup(p) {
       <span>Hours</span><strong>${p.OPENING_HOURS || '—'}</strong>
     </div>
     <div class="source-note" style="margin:10px 0 0 0">OpenStreetMap record; completeness and tagging vary.</div>`;
+}
+
+function opportunityPopup(p) {
+  return `<div class="popup-title">Route ${Number(p.RTE)} corridor opportunity: ${Number(p.OPPORTUNITY_SCORE).toFixed(1)}/100</div>
+    <div class="popup-grid">
+      <span>Estimated AADT</span><strong>${fmt(p.AADT)}</strong>
+      <span>Nearest mapped service</span><strong>${p.NEAREST_SERVICE_MI == null ? '—' : Number(p.NEAREST_SERVICE_MI).toFixed(1) + ' mi'}</strong>
+      <span>Median household income</span><strong>${p.MEDIAN_HH_INCOME == null ? '—' : '
+  map.on('click', layerId, e => {
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(htmlFn(feature.properties)).addTo(map);
+  });
+  map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+  map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+}
+
+function incomeColorExpression() {
+  return ['step', ['coalesce', ['get', 'MEDIAN_HH_INCOME'], -1],
+    '#d9d9d9', 0, '#f1eef6', 50000, '#d7b5d8', 75000, '#df65b0',
+    100000, '#ce1256', 150000, '#980043', 200000, '#67001f'];
+}
+
+function densityColorExpression() {
+  return ['step', ['coalesce', ['get', 'POP_DENSITY_SQMI'], -1],
+    '#d9d9d9', 0, '#ffffcc', 100, '#c2e699', 500, '#78c679',
+    2000, '#31a354', 5000, '#006837'];
+}
+
+function updateContextLegend() {
+  const metric = document.getElementById('context-metric').value;
+  const title = document.getElementById('context-legend-title');
+  const rows = document.getElementById('context-legend-rows');
+  if (metric === 'density') {
+    title.textContent = 'Population density';
+    rows.innerHTML = '<div><span class="swatch density-1"></span> Under 100/sq mi</div><div><span class="swatch density-2"></span> 100–500/sq mi</div><div><span class="swatch density-3"></span> 500–2,000/sq mi</div><div><span class="swatch density-4"></span> 2,000–5,000/sq mi</div><div><span class="swatch density-5"></span> 5,000+/sq mi</div>';
+  } else {
+    title.textContent = 'Median household income';
+    rows.innerHTML = '<div><span class="swatch income-1"></span> Under $50k</div><div><span class="swatch income-2"></span> $50k–$75k</div><div><span class="swatch income-3"></span> $75k–$100k</div><div><span class="swatch income-4"></span> $100k–$150k</div><div><span class="swatch income-5"></span> $150k–$200k</div><div><span class="swatch income-6"></span> $200k+</div>';
+  }
+  if (map.getLayer('acs-context-fill')) {
+    map.setPaintProperty('acs-context-fill', 'fill-color', metric === 'density' ? densityColorExpression() : incomeColorExpression());
+  }
+}
+
+async function ensureContextLayer() {
+  if (contextLoaded) return;
+  const data = await loadGeoJson('data/acs-2024-tract-context.geojson');
+  map.addSource('acs-context', { type: 'geojson', data });
+  map.addLayer({
+    id: 'acs-context-fill', type: 'fill', source: 'acs-context',
+    layout: { visibility: 'none' },
+    paint: { 'fill-color': incomeColorExpression(), 'fill-opacity': 0.42 }
+  }, 'traffic-segments');
+  map.addLayer({
+    id: 'acs-context-outline', type: 'line', source: 'acs-context',
+    layout: { visibility: 'none' },
+    paint: { 'line-color': '#ffffff', 'line-opacity': 0.28, 'line-width': 0.5 }
+  }, 'traffic-segments');
+
+  map.on('click', 'acs-context-fill', e => {
+    const blocking = map.queryRenderedFeatures(e.point, {
+      layers: ['traffic-segments', 'aadt-points', 'truck-points', 'service-points'].filter(id => map.getLayer(id))
+    });
+    if (blocking.length) return;
+    const feature = e.features && e.features[0];
+    if (!feature) return;
+    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(contextPopup(feature.properties)).addTo(map);
+  });
+  contextLoaded = true;
+}
+
+function selectedServiceCategories() {
+  return [...document.querySelectorAll('.service-category:checked')].map(el => el.value);
+}
+
+function updateServiceFilter() {
+  if (!map.getLayer('service-points')) return;
+  const categories = selectedServiceCategories();
+  map.setFilter('service-points', categories.length
+    ? ['in', ['get', 'CATEGORY'], ['literal', categories]]
+    : ['==', ['get', 'CATEGORY'], '__none__']);
+}
+
+async function ensureOpportunityLayer() {
+  if (opportunityLoaded) return;
+  const data = await loadGeoJson('data/opportunity-2024.geojson');
+  opportunityFeatures = data.features || [];
+  map.addSource('opportunity', { type: 'geojson', data });
+  map.addLayer({
+    id: 'opportunity-segments',
+    type: 'line',
+    source: 'opportunity',
+    layout: { visibility: 'none' },
+    paint: {
+      'line-color': [
+        'step', ['get', 'OPPORTUNITY_SCORE'],
+        '#bdbdbd',
+        50, '#fed976',
+        65, '#fd8d3c',
+        80, '#bd0026'
+      ],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3.2, 8, 6.0, 12, 9.0],
+      'line-opacity': 0.92
+    }
+  });
+  bindLayerPopup('opportunity-segments', opportunityPopup);
+  document.getElementById('opportunity-score').disabled = false;
+  updateFilters();
+  opportunityLoaded = true;
+}
+
+async function ensureServiceLayer() {
+  if (serviceLoaded) return;
+  const data = await loadGeoJson('data/services-osm.geojson');
+  serviceFeatures = data.features || [];
+  map.addSource('services', { type: 'geojson', data });
+  map.addLayer({
+    id: 'service-points',
+    type: 'circle',
+    source: 'services',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': [
+        'match', ['get', 'CATEGORY'],
+        'food_cluster', ['interpolate', ['linear'], ['coalesce', ['get', 'COUNT'], 3], 3, 4, 10, 7, 30, 11],
+        'truck_service', 7,
+        'service_area', 6,
+        'rest_area', 6,
+        'ev_charging', 5,
+        5
+      ],
+      'circle-color': [
+        'match', ['get', 'CATEGORY'],
+        'fuel', '#8c6d31',
+        'truck_service', '#54278f',
+        'service_area', '#756bb1',
+        'rest_area', '#31a354',
+        'ev_charging', '#2b8cbe',
+        'food_cluster', '#de2d26',
+        '#636363'
+      ],
+      'circle-opacity': 0.82,
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 0.8
+    }
+  });
+  bindLayerPopup('service-points', servicePopup);
+  updateServiceFilter();
+  serviceLoaded = true;
+}
+
+map.on('load', async () => {
+  map.fitBounds([[-124.48, 32.52], [-114.13, 42.01]], { padding: 36, duration: 0 });
+  const status = document.getElementById('status-message');
+
+  try {
+    const [aadtData, truckData, segmentData] = await Promise.all([
+      loadGeoJson('data/aadt-2024.geojson'),
+      loadGeoJson('data/truck-2024.geojson'),
+      loadGeoJson('data/aadt-2024-segments.geojson')
+    ]);
+    aadtFeatures = aadtData.features || [];
+    truckFeatures = truckData.features || [];
+    segmentFeatures = segmentData.features || [];
+
+    map.addSource('traffic-segments', { type: 'geojson', data: { type: 'FeatureCollection', features: segmentFeatures } });
+    map.addLayer({
+      id: 'traffic-segments', type: 'line', source: 'traffic-segments',
+      paint: {
+        'line-color': ['step', ['get', 'AADT'], '#69b3a2', 25000, '#f0c05a', 75000, '#e8824f', 150000, '#b94040'],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 4, 2.0, 8, 4.0, 12, 7.0],
+        'line-opacity': 0.88
+      }
+    });
+
+    map.addSource('aadt', { type: 'geojson', data: { type: 'FeatureCollection', features: aadtFeatures } });
+    map.addLayer({
+      id: 'aadt-points', type: 'circle', source: 'aadt', layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'MAX_AADT'], 0, 3, 25000, 4, 75000, 6, 150000, 8, 300000, 11],
+        'circle-color': ['step', ['get', 'MAX_AADT'], '#69b3a2', 25000, '#f0c05a', 75000, '#e8824f', 150000, '#b94040'],
+        'circle-opacity': 0.82, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8
+      }
+    });
+
+    map.addSource('truck', { type: 'geojson', data: { type: 'FeatureCollection', features: truckFeatures } });
+    map.addLayer({
+      id: 'truck-points', type: 'circle', source: 'truck', layout: { visibility: 'none' },
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['coalesce', ['get', 'TRUCK_AADT'], 0], 0, 3, 1000, 4, 5000, 6, 10000, 8, 25000, 11],
+        'circle-color': ['step', ['coalesce', ['get', 'TRUCK_PERCENT'], 0], '#b9c7d8', 5, '#7ba0c7', 10, '#477aa8', 20, '#244c73'],
+        'circle-opacity': 0.82, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 0.8
+      }
+    });
+
+    populateRoutes();
+    document.getElementById('aadt').disabled = false;
+    document.getElementById('truck-pct').disabled = false;
+    updateFilters();
+    bindLayerPopup('traffic-segments', segmentPopup);
+    bindLayerPopup('aadt-points', aadtPopup);
+    bindLayerPopup('truck-points', truckPopup);
+
+    status.textContent = `${segmentFeatures.length.toLocaleString('en-US')} derived traffic segments, ${aadtFeatures.length.toLocaleString('en-US')} 2024 AADT locations, and ${truckFeatures.length.toLocaleString('en-US')} 2024 truck locations loaded.`;
+  } catch (error) {
+    console.error(error);
+    status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
+  }
+});
+
+document.getElementById('route').addEventListener('change', updateFilters);
+document.getElementById('aadt').addEventListener('input', updateFilters);
+document.getElementById('truck-pct').addEventListener('input', updateFilters);
+document.getElementById('opportunity-score').addEventListener('input', e => {
+  document.getElementById('opportunity-score-value').textContent = e.target.value;
+  updateFilters();
+});
+
+document.getElementById('segment-layer').addEventListener('change', e => {
+  if (map.getLayer('traffic-segments')) map.setLayoutProperty('traffic-segments', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+document.getElementById('aadt-layer').addEventListener('change', e => {
+  if (map.getLayer('aadt-points')) map.setLayoutProperty('aadt-points', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+document.getElementById('truck-layer').addEventListener('change', e => {
+  if (map.getLayer('truck-points')) map.setLayoutProperty('truck-points', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+
+document.getElementById('opportunity-layer').addEventListener('change', async e => {
+  const status = document.getElementById('status-message');
+  try {
+    if (e.target.checked) {
+      status.textContent = 'Loading corridor opportunity scores…';
+      await ensureOpportunityLayer();
+      map.setLayoutProperty('opportunity-segments', 'visibility', 'visible');
+      updateFilters();
+      const minScore = Number(document.getElementById('opportunity-score').value);
+      const visible = opportunityFeatures.filter(f => num(f.properties.OPPORTUNITY_SCORE) >= minScore).length;
+      status.textContent = `${visible.toLocaleString('en-US')} corridor segments score ${minScore}+ in the first-pass opportunity model.`;
+    } else if (opportunityLoaded) {
+      map.setLayoutProperty('opportunity-segments', 'visibility', 'none');
+    }
+  } catch (error) {
+    console.error(error);
+    e.target.checked = false;
+    status.textContent = 'Opportunity scores are not available yet. The scoring workflow may still be running.';
+  }
+});
+
+document.getElementById('service-layer').addEventListener('change', async e => {
+  const status = document.getElementById('status-message');
+  try {
+    if (e.target.checked) {
+      status.textContent = 'Loading service and competition data…';
+      await ensureServiceLayer();
+      map.setLayoutProperty('service-points', 'visibility', 'visible');
+      updateServiceFilter();
+      status.textContent = `${serviceFeatures.length.toLocaleString('en-US')} service / competition features loaded from OpenStreetMap.`;
+    } else if (serviceLoaded) {
+      map.setLayoutProperty('service-points', 'visibility', 'none');
+    }
+  } catch (error) {
+    console.error(error);
+    e.target.checked = false;
+    status.textContent = 'Service data is not available yet. The data-build workflow may still be running.';
+  }
+});
+
+document.querySelectorAll('.service-category').forEach(el => el.addEventListener('change', updateServiceFilter));
+
+document.getElementById('context-layer').addEventListener('change', async e => {
+  const status = document.getElementById('status-message');
+  try {
+    if (e.target.checked) {
+      status.textContent = 'Loading 2024 ACS tract context…';
+      await ensureContextLayer();
+      map.setLayoutProperty('acs-context-fill', 'visibility', 'visible');
+      map.setLayoutProperty('acs-context-outline', 'visibility', 'visible');
+      updateContextLegend();
+      status.textContent = '2024 ACS tract context loaded.';
+    } else if (contextLoaded) {
+      map.setLayoutProperty('acs-context-fill', 'visibility', 'none');
+      map.setLayoutProperty('acs-context-outline', 'visibility', 'none');
+    }
+  } catch (error) {
+    console.error(error);
+    e.target.checked = false;
+    status.textContent = 'The ACS context layer could not be loaded.';
+  }
+});
+document.getElementById('context-metric').addEventListener('change', updateContextLegend);
+ + Number(p.MEDIAN_HH_INCOME).toLocaleString('en-US')}</strong>
+      <span>Population density</span><strong>${p.POP_DENSITY_SQMI == null ? '—' : Number(p.POP_DENSITY_SQMI).toLocaleString('en-US') + '/sq mi'}</strong>
+      <span>Nearby truck share</span><strong>${p.TRUCK_PERCENT_NEARBY == null ? '—' : Number(p.TRUCK_PERCENT_NEARBY).toFixed(1) + '%'}</strong>
+      <span>Total-traffic score</span><strong>${Number(p.AADT_SCORE || 0).toFixed(1)} / 35</strong>
+      <span>Service-distance score</span><strong>${Number(p.SERVICE_DISTANCE_SCORE || 0).toFixed(1)} / 20</strong>
+      <span>Competition score</span><strong>${Number(p.COMPETITION_SCORE || 0).toFixed(1)} / 15</strong>
+      <span>Income score</span><strong>${Number(p.INCOME_SCORE || 0).toFixed(1)} / 12</strong>
+      <span>Density score</span><strong>${Number(p.DENSITY_SCORE || 0).toFixed(1)} / 8</strong>
+      <span>Truck contribution</span><strong>${Number(p.TRUCK_SCORE || 0).toFixed(1)} / 10</strong>
+    </div>
+    <div class="source-note" style="margin:10px 0 0 0">
+      First-pass screening model. Service distance is straight-line, not routed highway distance. Land availability, access, tourism, entitlement and site economics are not yet included.
+    </div>`;
 }
 
 function bindLayerPopup(layerId, htmlFn) {
