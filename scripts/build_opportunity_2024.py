@@ -28,26 +28,34 @@ SEGMENTS = Path("data/aadt-2024-segments.geojson")
 TRUCKS = Path("data/truck-2024.geojson")
 ACS = Path("data/acs-2024-tract-context.geojson")
 SERVICES = Path("data/services-osm.geojson")
+TRAVELLER = Path("data/traveller-context-osm.geojson")
 OUT = Path("data/opportunity-2024.geojson")
 META = Path("data/opportunity-2024-meta.json")
 
 # Overall weights sum to 100.
 WEIGHTS = {
-    "total_aadt": 35.0,
-    "truck_share": 10.0,
-    "service_distance": 20.0,
+    "total_aadt": 30.0,
+    "truck_share": 5.0,
+    "service_distance": 15.0,
     "nearby_competition": 15.0,
-    "household_income": 12.0,
-    "population_density": 8.0,
+    "household_income": 10.0,
+    "population_density": 5.0,
+    "traveller_demand": 10.0,
+    "accessibility": 10.0,
 }
 
 SERVICE_WEIGHT = {
-    "fuel": 0.75,
-    "truck_service": 2.0,
-    "service_area": 2.5,
-    "rest_area": 1.0,
-    "ev_charging": 0.5,
-    "food_cluster": 1.25,
+    "fuel": 0.8,
+    "truck_service": 2.4,
+    "service_area": 3.0,
+    "rest_area": 1.2,
+    "ev_charging": 0.6,
+    "food_cluster": 1.5,
+}
+
+LONG_DISTANCE_ROUTES = {
+    "5": 1.0, "8": 0.9, "10": 1.0, "15": 1.0, "40": 1.0, "80": 1.0,
+    "101": 0.9, "99": 0.8, "50": 0.7, "58": 0.8, "395": 0.8, "1": 0.7,
 }
 
 MEANINGFUL_CATEGORIES = set(SERVICE_WEIGHT)
@@ -123,15 +131,60 @@ def nearest_service_stats(midpoints, services):
             distances.append(d)
             if d <= 10:
                 cat = row["CATEGORY"]
-                weighted_10mi += SERVICE_WEIGHT.get(cat, 1.0)
+                strength = row.get("COMPETITION_STRENGTH")
+                try:
+                    strength = float(strength)
+                except (TypeError, ValueError):
+                    strength = SERVICE_WEIGHT.get(cat, 1.0)
+                weighted_10mi += strength
                 category_counts[cat] += 1
                 if d <= 5:
-                    weighted_5mi += SERVICE_WEIGHT.get(cat, 1.0)
+                    weighted_5mi += strength
 
         nearest = min(distances) if distances else None
         results.append((nearest, weighted_5mi, weighted_10mi, dict(category_counts)))
     return results
 
+
+
+def traveller_access_stats(midpoints, traveller):
+    junctions = traveller[traveller["CATEGORY"] == "interchange"].copy()
+    clusters = traveller[traveller["CATEGORY"] == "traveller_cluster"].copy()
+
+    def make_tree(gdf):
+        if gdf.empty:
+            return None
+        lon = gdf.geometry.x.to_numpy()
+        lat = gdf.geometry.y.to_numpy()
+        return cKDTree(lonlat_to_unit(lon, lat)), lon, lat
+
+    junction_tree = make_tree(junctions)
+    cluster_tree = make_tree(clusters)
+    results = []
+
+    for p in midpoints:
+        nearest_junction = None
+        traveller_intensity = 0.0
+
+        if junction_tree:
+            tree, lon, lat = junction_tree
+            _, idx = tree.query(lonlat_to_unit(np.array([p.x]), np.array([p.y]))[0], k=1)
+            nearest_junction = haversine_miles(p.x, p.y, lon[int(idx)], lat[int(idx)])
+
+        if cluster_tree:
+            tree, lon, lat = cluster_tree
+            k = min(12, len(clusters))
+            _, idxs = tree.query(lonlat_to_unit(np.array([p.x]), np.array([p.y]))[0], k=k)
+            idxs = np.atleast_1d(idxs)
+            for idx in idxs:
+                row = clusters.iloc[int(idx)]
+                d = haversine_miles(p.x, p.y, row.geometry.x, row.geometry.y)
+                if d <= 20:
+                    intensity = float(row.get("TRAVELLER_INTENSITY") or 0)
+                    traveller_intensity += intensity * max(0.0, 1.0 - d / 20.0)
+
+        results.append((nearest_junction, traveller_intensity))
+    return results
 
 def attach_acs(mid_gdf, acs):
     cols = ["MEDIAN_HH_INCOME", "POP_DENSITY_SQMI", "POPULATION", "geometry"]
@@ -179,6 +232,7 @@ def main():
     trucks = gpd.read_file(TRUCKS).to_crs(4326)
     acs = gpd.read_file(ACS).to_crs(4326)
     services = gpd.read_file(SERVICES).to_crs(4326)
+    traveller = gpd.read_file(TRAVELLER).to_crs(4326)
 
     midpoints = [midpoint_of_line(g) for g in segments.geometry]
     mid_gdf = gpd.GeoDataFrame({"geometry": midpoints}, crs="EPSG:4326")
@@ -186,6 +240,7 @@ def main():
     acs_join = attach_acs(mid_gdf, acs)
     truck_pct = nearest_truck_share(midpoints, segments, trucks)
     service_stats = nearest_service_stats(midpoints, services)
+    traveller_stats = traveller_access_stats(midpoints, traveller)
 
     features = []
     score_values = []
@@ -197,11 +252,14 @@ def main():
         density = acs_join.iloc[i].get("POP_DENSITY_SQMI")
         population = acs_join.iloc[i].get("POPULATION")
         nearest_service, competition_5, competition_10, category_counts = service_stats[i]
+        nearest_junction, traveller_intensity = traveller_stats[i]
+        route_key = str(int(float(seg.get("RTE")))) if seg.get("RTE") not in (None, "") else ""
+        long_distance_factor = LONG_DISTANCE_ROUTES.get(route_key, 0.35)
 
-        # Demand: total AADT dominates. Full score by ~120k AADT.
+        # Total passing traffic remains the primary demand signal.
         aadt_score = linear_score(aadt, 10000, 120000, WEIGHTS["total_aadt"])
 
-        # Trucks matter, but they are intentionally secondary. Full score at 20%.
+        # Trucks are useful incremental demand, deliberately limited to 5% of the model.
         truck_score = linear_score(t_pct, 3, 20, WEIGHTS["truck_share"])
 
         # Scarcity: little credit within 2 miles; full distance score at 25+ miles.
@@ -214,13 +272,26 @@ def main():
         # 0 weighted competition = full 15 points; 12+ weighted units = 0.
         nearby_comp_score = WEIGHTS["nearby_competition"] * (1 - clamp(competition_10 / 12.0))
 
-        # Consumer context: income and density are useful but do not dominate.
+        # Consumer context is useful, but the concept is primarily supported by travellers.
         income_score = linear_score(income, 50000, 160000, WEIGHTS["household_income"])
         density_score = linear_score(density, 25, 4000, WEIGHTS["population_density"])
 
+        route_component = WEIGHTS["traveller_demand"] * 0.55 * long_distance_factor
+        tourism_component = linear_score(traveller_intensity, 0, 180, WEIGHTS["traveller_demand"] * 0.45)
+        traveller_score = route_component + tourism_component
+
+        if nearest_junction is None:
+            access_score = WEIGHTS["accessibility"] * 0.5
+        elif nearest_junction <= 1.5:
+            access_score = WEIGHTS["accessibility"]
+        elif nearest_junction <= 5:
+            access_score = WEIGHTS["accessibility"] * (1.0 - 0.5 * ((nearest_junction - 1.5) / 3.5))
+        else:
+            access_score = WEIGHTS["accessibility"] * 0.5
+
         total_score = round(
-            aadt_score + truck_score + service_distance_score +
-            nearby_comp_score + income_score + density_score, 1
+            aadt_score + truck_score + service_distance_score + nearby_comp_score +
+            income_score + density_score + traveller_score + access_score, 1
         )
 
         # Avoid presenting weak-demand remote roads as attractive solely because
@@ -237,6 +308,11 @@ def main():
             "COMPETITION_SCORE": round(nearby_comp_score, 1),
             "INCOME_SCORE": round(income_score, 1),
             "DENSITY_SCORE": round(density_score, 1),
+            "TRAVELLER_SCORE": round(traveller_score, 1),
+            "ACCESS_SCORE": round(access_score, 1),
+            "LONG_DISTANCE_FACTOR": round(long_distance_factor, 2),
+            "TRAVELLER_INTENSITY": round(traveller_intensity, 1),
+            "NEAREST_INTERCHANGE_MI": None if nearest_junction is None else round(nearest_junction, 1),
             "TRUCK_PERCENT_NEARBY": None if t_pct is None else round(float(t_pct), 1),
             "MEDIAN_HH_INCOME": None if income is None or not np.isfinite(float(income)) else int(income),
             "POP_DENSITY_SQMI": None if density is None or not np.isfinite(float(density)) else round(float(density), 1),
@@ -245,7 +321,7 @@ def main():
             "COMPETITION_WEIGHT_5MI": round(competition_5, 2),
             "COMPETITION_WEIGHT_10MI": round(competition_10, 2),
             "SERVICE_COUNTS_10MI": json.dumps(category_counts, separators=(",", ":")),
-            "MODEL_VERSION": "0.1",
+            "MODEL_VERSION": "0.2",
         })
         score_values.append(total_score)
         features.append({
@@ -258,7 +334,7 @@ def main():
 
     meta = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "model_version": "0.1",
+        "model_version": "0.2",
         "feature_count": len(features),
         "weights": WEIGHTS,
         "score_summary": {
@@ -274,7 +350,9 @@ def main():
             "OpenStreetMap completeness and tagging vary.",
             "ACS tract conditions describe nearby community context, not traveller demographics.",
             "Truck share uses the nearest same-route truck count within approximately 15 miles.",
-            "Land availability, interchange geometry, access, visibility, tourism demand, entitlement constraints, land value, utilities and environmental constraints are not yet included.",
+            "Traveller demand uses OSM tourism/lodging concentration plus a transparent interregional-route proxy, not measured trip purpose.",
+            "Accessibility uses OSM motorway junction proximity and is neutralized where that tagging does not describe an at-grade route.",
+            "Land availability, parcel access, visibility, entitlement constraints, land value, utilities and environmental constraints are not yet included.",
         ],
     }
     META.write_text(json.dumps(meta, indent=2), encoding="utf-8")
