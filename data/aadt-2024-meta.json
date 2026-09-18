@@ -1,0 +1,27 @@
+{
+  "source_year": 2024,
+  "source_url": "https://dot.ca.gov/-/media/dot-media/programs/traffic-operations/documents/census/2024/2024-traffic-volumes-ca-a11y.xlsx",
+  "gis_reference_layer": "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/Traffic_AADT/FeatureServer/0/query",
+  "records_written": 7131,
+  "exact_matches": 7107,
+  "nearest_postmile_matches": 24,
+  "unmatched_rows": 127,
+  "sheet_name": "2024 AADT DATA",
+  "header_row": 0,
+  "columns": [
+    "DISTRICT",
+    "RTE",
+    "RTE_SFX",
+    "CNTY",
+    "PM_PFX",
+    "PM",
+    "PM_SFX",
+    "DESCRIPTION",
+    "BACK_PEAK_HOUR",
+    "BACK_PEAK_MADT",
+    "BACK_AADT",
+    "AHEAD_PEAK_HOUR",
+    "AHEAD_PEAK_MADT",
+    "AHEAD_AADT"
+  ]
+}
