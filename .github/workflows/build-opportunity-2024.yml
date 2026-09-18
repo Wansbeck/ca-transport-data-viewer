@@ -15,6 +15,10 @@ on:
       - "data/services-osm.geojson"
       - "data/traveller-context-osm.geojson"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
@@ -39,6 +43,10 @@ jobs:
           python scripts/build_opportunity_2024.py
       - name: Commit opportunity data
         run: |
+          if [ ! -f data/opportunity-2024.geojson ] || [ ! -f data/opportunity-2024-meta.json ]; then
+            echo "No opportunity output generated on this run."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/opportunity-2024.geojson data/opportunity-2024-meta.json
