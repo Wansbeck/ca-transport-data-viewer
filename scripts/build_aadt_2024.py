@@ -123,6 +123,9 @@ def main():
     route_col = norm_cols.get("rte") or find_col(df.columns, ("route",))
     county_col = norm_cols.get("cnty") or norm_cols.get("co") or find_col(df.columns, ("county",))
     pm_col = norm_cols.get("pm") or find_col(df.columns, ("postmile",)) or find_col(df.columns, ("post", "mile"))
+    pm_pfx_col = norm_cols.get("pm_pfx")
+    pm_sfx_col = norm_cols.get("pm_sfx")
+    rte_sfx_col = norm_cols.get("rte_sfx")
     desc_col = norm_cols.get("description") or find_col(df.columns, ("description",))
     back_aadt_col = norm_cols.get("back_aadt") or find_col(df.columns, ("back", "aadt"))
     ahead_aadt_col = norm_cols.get("ahead_aadt") or find_col(df.columns, ("ahead", "aadt"))
@@ -195,6 +198,9 @@ def main():
             "RTE": route,
             "CNTY": county,
             "PM": pm,
+            "PM_PFX": clean_text(row.get(pm_pfx_col)).upper() if pm_pfx_col else "",
+            "PM_SFX": clean_text(row.get(pm_sfx_col)).upper() if pm_sfx_col else "",
+            "RTE_SFX": clean_text(row.get(rte_sfx_col)).upper() if rte_sfx_col else "",
             "DESCRIPTION": clean_text(row.get(desc_col)) if desc_col else "",
             "BACK_AADT": back,
             "AHEAD_AADT": ahead,
