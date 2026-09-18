@@ -1,0 +1,10 @@
+{
+  "generated_at_utc": "2026-09-18T22:34:41.640109+00:00",
+  "source": "OpenStreetMap contributors via Overpass API",
+  "junction_count": 9212,
+  "traveller_cluster_count": 1226,
+  "notes": [
+    "Tourism/hospitality intensity is a screening proxy, not measured visitation.",
+    "Interchanges are OSM motorway_junction nodes; at-grade highway access is not fully represented."
+  ]
+}
