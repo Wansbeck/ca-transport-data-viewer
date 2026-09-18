@@ -13,6 +13,7 @@ on:
       - "data/truck-2024.geojson"
       - "data/acs-2024-tract-context.geojson"
       - "data/services-osm.geojson"
+      - "data/traveller-context-osm.geojson"
 
 permissions:
   contents: write
@@ -31,8 +32,8 @@ jobs:
         run: pip install geopandas scipy
       - name: Build opportunity layer
         run: |
-          if [ ! -f data/services-osm.geojson ]; then
-            echo "Service dataset is not available yet; opportunity build will run after the service workflow completes."
+          if [ ! -f data/services-osm.geojson ] || [ ! -f data/traveller-context-osm.geojson ]; then
+            echo "Upstream service/traveller datasets are not available yet; opportunity build will run after they are committed."
             exit 0
           fi
           python scripts/build_opportunity_2024.py
