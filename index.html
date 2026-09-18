@@ -32,10 +32,15 @@
         <div class="source-note">
           Traffic points use official 2024 Caltrans census values. Segment colors are a derived analytical approximation between adjacent count locations on the official Caltrans State Highway Network.
         </div>
-        <label class="control-row muted">
-          <input type="checkbox" disabled>
-          <span>Household income</span>
+        <label class="control-row">
+          <input id="context-layer" type="checkbox">
+          <span>2024 ACS community context</span>
         </label>
+        <label for="context-metric">Context metric</label>
+        <select id="context-metric">
+          <option value="income">Median household income</option>
+          <option value="density">Population density</option>
+        </select>
       </section>
 
       <section>
@@ -72,9 +77,21 @@
         <div><span class="dot truck-very-high"></span> 20%+</div>
       </section>
 
+      <section class="legend context-legend">
+        <h2 id="context-legend-title">Median household income</h2>
+        <div id="context-legend-rows">
+          <div><span class="swatch income-1"></span> Under $50k</div>
+          <div><span class="swatch income-2"></span> $50k–$75k</div>
+          <div><span class="swatch income-3"></span> $75k–$100k</div>
+          <div><span class="swatch income-4"></span> $100k–$150k</div>
+          <div><span class="swatch income-5"></span> $150k–$200k</div>
+          <div><span class="swatch income-6"></span> $200k+</div>
+        </div>
+      </section>
+
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.5</strong></p>
+        <p><strong>Version 0.6</strong></p>
         <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
