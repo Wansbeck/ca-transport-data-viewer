@@ -519,9 +519,9 @@ document.getElementById('truck-layer').addEventListener('change', event => {
 function incomeColorExpression() {
   return [
     'case',
-    ['!', ['has', 'MEDIAN_HH_INCOME']], '#d9d9d9',
-    ['step', ['get', 'MEDIAN_HH_INCOME'],
-      '#f1eef6',
+    ['step', ['coalesce', ['get', 'MEDIAN_HH_INCOME'], -1],
+      '#d9d9d9',
+      0, '#f1eef6',
       50000, '#d7b5d8',
       75000, '#df65b0',
       100000, '#ce1256',
@@ -534,9 +534,9 @@ function incomeColorExpression() {
 function densityColorExpression() {
   return [
     'case',
-    ['!', ['has', 'POP_DENSITY_SQMI']], '#d9d9d9',
-    ['step', ['get', 'POP_DENSITY_SQMI'],
-      '#ffffcc',
+    ['step', ['coalesce', ['get', 'POP_DENSITY_SQMI'], -1],
+      '#d9d9d9',
+      0, '#ffffcc',
       100, '#c2e699',
       500, '#78c679',
       2000, '#31a354',
