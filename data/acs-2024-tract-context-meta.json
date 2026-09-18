@@ -1,0 +1,19 @@
+{
+  "source_year": 2024,
+  "acs_release": "2024 ACS 5-year estimates",
+  "geography": "California census tracts",
+  "tract_count": 9109,
+  "income_records": 9007,
+  "population_records": 9129,
+  "income_variable": "B19013_E001",
+  "income_definition": "Median household income in the past 12 months (2024 inflation-adjusted dollars)",
+  "population_variable": "B01003_E001",
+  "income_source": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b19013.dat",
+  "population_source": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b01003.dat",
+  "geometry_source": "https://www2.census.gov/geo/tiger/GENZ2024/shp/cb_2024_06_tract_500k.zip",
+  "notes": [
+    "ACS values are survey estimates and include margins of error.",
+    "Population density uses Census ALAND land area rather than cartographic polygon area.",
+    "Cartographic tract boundaries are generalized for web mapping."
+  ]
+}
