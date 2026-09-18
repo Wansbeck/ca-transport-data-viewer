@@ -1,0 +1,38 @@
+name: Build service competition data
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "scripts/build_services_osm.py"
+      - ".github/workflows/build-services-osm.yml"
+  schedule:
+    - cron: "23 10 1 * *"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Build service data
+        run: python scripts/build_services_osm.py
+      - name: Commit refreshed data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/services-osm.geojson data/services-osm-meta.json
+          if git diff --cached --quiet; then
+            echo "No service data changes to commit."
+          else
+            git commit -m "Refresh service competition data"
+            git push
+          fi
