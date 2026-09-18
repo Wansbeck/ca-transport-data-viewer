@@ -198,3 +198,15 @@ select {
 .svc-rest { background: #31a354; }
 .svc-ev { background: #2b8cbe; }
 .svc-food { background: #de2d26; }
+
+
+.line-swatch {
+  width: 22px;
+  height: 5px;
+  display: inline-block;
+  border-radius: 3px;
+}
+.opp-low { background: #bdbdbd; }
+.opp-med { background: #fed976; }
+.opp-high { background: #fd8d3c; }
+.opp-very-high { background: #bd0026; }
