@@ -12,26 +12,23 @@
     <aside class="sidebar">
       <div class="brand">
         <h1>California Highway Opportunity Explorer</h1>
-        <p>Interactive highway traffic and service-area analysis.</p>
+        <p>Interactive California state-highway traffic analysis.</p>
       </div>
 
       <section>
         <h2>Layers</h2>
         <label class="control-row">
-          <input type="checkbox" checked disabled>
-          <span>Base map</span>
+          <input id="aadt-layer" type="checkbox" checked>
+          <span>Caltrans AADT count locations</span>
         </label>
-        <label class="control-row muted">
-          <input type="checkbox" disabled>
-          <span>2024 AADT</span>
-        </label>
+        <div class="source-note">Current GIS layer: 2023. The published 2024 census values will be joined to these locations in the next data step.</div>
         <label class="control-row muted">
           <input type="checkbox" disabled>
           <span>2024 Truck AADT</span>
         </label>
         <label class="control-row muted">
           <input type="checkbox" disabled>
-          <span>Traffic segments</span>
+          <span>Derived traffic segments</span>
         </label>
       </section>
 
@@ -39,18 +36,27 @@
         <h2>Filters</h2>
         <label for="route">Route</label>
         <select id="route" disabled>
-          <option>All routes</option>
+          <option value="all">Loading routes…</option>
         </select>
 
         <label for="aadt">Minimum AADT</label>
-        <input id="aadt" type="range" min="0" max="150000" value="0" disabled>
-        <div class="range-value">Traffic data coming next</div>
+        <input id="aadt" type="range" min="0" max="200000" step="5000" value="0" disabled>
+        <div class="range-value"><span id="aadt-value">0</span> vehicles/day minimum</div>
+        <div id="visible-count" class="range-value"></div>
+      </section>
+
+      <section class="legend">
+        <h2>AADT</h2>
+        <div><span class="dot dot-low"></span> Under 25,000</div>
+        <div><span class="dot dot-med"></span> 25,000–75,000</div>
+        <div><span class="dot dot-high"></span> 75,000–150,000</div>
+        <div><span class="dot dot-very-high"></span> 150,000+</div>
       </section>
 
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.1</strong></p>
-        <p>Base map working. Caltrans traffic layers will be added next.</p>
+        <p><strong>Version 0.2</strong></p>
+        <p id="status-message">Loading Caltrans AADT data…</p>
       </section>
     </aside>
 
