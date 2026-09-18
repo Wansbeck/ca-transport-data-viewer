@@ -18,18 +18,20 @@
       <section>
         <h2>Layers</h2>
         <label class="control-row">
-          <input id="aadt-layer" type="checkbox" checked>
-          <span>2024 total AADT</span>
+          <input id="segment-layer" type="checkbox" checked>
+          <span>Derived 2024 traffic segments</span>
+        </label>
+        <label class="control-row">
+          <input id="aadt-layer" type="checkbox">
+          <span>2024 AADT count locations</span>
         </label>
         <label class="control-row">
           <input id="truck-layer" type="checkbox">
           <span>2024 truck traffic</span>
         </label>
-        <div class="source-note">Official 2024 Caltrans census values matched to Caltrans GIS count locations. Unmatched records are omitted rather than assigned speculative coordinates.</div>
-        <label class="control-row muted">
-          <input type="checkbox" disabled>
-          <span>Derived traffic segments</span>
-        </label>
+        <div class="source-note">
+          Traffic points use official 2024 Caltrans census values. Segment colors are a derived analytical approximation between adjacent count locations on the official Caltrans State Highway Network.
+        </div>
         <label class="control-row muted">
           <input type="checkbox" disabled>
           <span>Household income</span>
@@ -72,7 +74,7 @@
 
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.4</strong></p>
+        <p><strong>Version 0.5</strong></p>
         <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
