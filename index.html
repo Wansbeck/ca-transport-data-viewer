@@ -33,6 +33,21 @@
           Traffic points use official 2024 Caltrans census values. Segment colors are a derived analytical approximation between adjacent count locations on the official Caltrans State Highway Network.
         </div>
         <label class="control-row">
+          <input id="service-layer" type="checkbox">
+          <span>Service / competition</span>
+        </label>
+        <div id="service-controls" class="service-controls">
+          <label class="control-row service-subrow"><input class="service-category" value="fuel" type="checkbox" checked><span>Fuel stations</span></label>
+          <label class="control-row service-subrow"><input class="service-category" value="truck_service" type="checkbox" checked><span>Truck-oriented service</span></label>
+          <label class="control-row service-subrow"><input class="service-category" value="service_area" type="checkbox" checked><span>Service areas</span></label>
+          <label class="control-row service-subrow"><input class="service-category" value="rest_area" type="checkbox" checked><span>Rest areas</span></label>
+          <label class="control-row service-subrow"><input class="service-category" value="ev_charging" type="checkbox" checked><span>EV charging</span></label>
+          <label class="control-row service-subrow"><input class="service-category" value="food_cluster" type="checkbox" checked><span>Food clusters</span></label>
+        </div>
+        <div class="source-note">
+          Service locations are from OpenStreetMap. Food is aggregated into mapped venue clusters; completeness varies by area.
+        </div>
+        <label class="control-row">
           <input id="context-layer" type="checkbox">
           <span>2024 ACS community context</span>
         </label>
@@ -89,9 +104,18 @@
         </div>
       </section>
 
+      <section class="legend">
+        <h2>Service / competition</h2>
+        <div><span class="dot svc-fuel"></span> Fuel</div>
+        <div><span class="dot svc-truck"></span> Truck-oriented service</div>
+        <div><span class="dot svc-rest"></span> Rest / service area</div>
+        <div><span class="dot svc-ev"></span> EV charging</div>
+        <div><span class="dot svc-food"></span> Food cluster</div>
+      </section>
+
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.6</strong></p>
+        <p><strong>Version 0.7</strong></p>
         <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
