@@ -33,6 +33,17 @@
           Traffic points use official 2024 Caltrans census values. Segment colors are a derived analytical approximation between adjacent count locations on the official Caltrans State Highway Network.
         </div>
         <label class="control-row">
+          <input id="opportunity-layer" type="checkbox">
+          <span>Corridor opportunity score</span>
+        </label>
+        <label for="opportunity-score">Minimum opportunity score</label>
+        <input id="opportunity-score" type="range" min="0" max="100" step="5" value="60" disabled>
+        <div class="range-value"><span id="opportunity-score-value">60</span>/100 minimum</div>
+        <div class="source-note">
+          Screening model combining total traffic, service scarcity, nearby competition, household income, population density, and a smaller truck-share component.
+        </div>
+
+        <label class="control-row">
           <input id="service-layer" type="checkbox">
           <span>Service / competition</span>
         </label>
@@ -105,6 +116,14 @@
       </section>
 
       <section class="legend">
+        <h2>Opportunity score</h2>
+        <div><span class="line-swatch opp-low"></span> Under 50</div>
+        <div><span class="line-swatch opp-med"></span> 50–65</div>
+        <div><span class="line-swatch opp-high"></span> 65–80</div>
+        <div><span class="line-swatch opp-very-high"></span> 80+</div>
+      </section>
+
+      <section class="legend">
         <h2>Service / competition</h2>
         <div><span class="dot svc-fuel"></span> Fuel</div>
         <div><span class="dot svc-truck"></span> Truck-oriented service</div>
@@ -115,7 +134,7 @@
 
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.7</strong></p>
+        <p><strong>Version 0.8</strong></p>
         <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
