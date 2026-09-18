@@ -1,0 +1,11 @@
+{
+  "source_year": 2024,
+  "shn_source": "https://caltrans-gis.dot.ca.gov/arcgis/rest/services/CHhighway/SHN_Lines/FeatureServer/0/query",
+  "aadt_source": "data/aadt-2024.geojson",
+  "segment_features_written": 14663,
+  "shn_features_loaded": 5266,
+  "shn_features_with_segments": 4542,
+  "shn_features_without_intervals": 50,
+  "bad_geometries": 12,
+  "methodology": "Traffic intervals are constructed between adjacent 2024 Caltrans AADT count locations. AADT for each interval is the mean of the upstream station's Ahead AADT and downstream station's Back AADT where available. Official SHN lines are clipped proportionally using their begin/end postmile measures. The result is a derived analytical layer, not an official Caltrans segment-level AADT dataset."
+}
