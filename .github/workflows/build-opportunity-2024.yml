@@ -3,7 +3,7 @@ name: Build opportunity score
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["Build service competition data"]
+    workflows: ["Build service competition data", "Build traveller context", "Build urban areas", "Build Caltrans SRRA"]
     types: [completed]
   push:
     paths:
