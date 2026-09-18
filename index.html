@@ -19,16 +19,20 @@
         <h2>Layers</h2>
         <label class="control-row">
           <input id="aadt-layer" type="checkbox" checked>
-          <span>2024 Caltrans AADT count locations</span>
+          <span>2024 total AADT</span>
         </label>
-        <div class="source-note">Official 2024 Caltrans census values matched to Caltrans GIS count locations. Unmatched records are omitted rather than geocoded speculatively.</div>
-        <label class="control-row muted">
-          <input type="checkbox" disabled>
-          <span>2024 Truck AADT</span>
+        <label class="control-row">
+          <input id="truck-layer" type="checkbox">
+          <span>2024 truck traffic</span>
         </label>
+        <div class="source-note">Official 2024 Caltrans census values matched to Caltrans GIS count locations. Unmatched records are omitted rather than assigned speculative coordinates.</div>
         <label class="control-row muted">
           <input type="checkbox" disabled>
           <span>Derived traffic segments</span>
+        </label>
+        <label class="control-row muted">
+          <input type="checkbox" disabled>
+          <span>Household income</span>
         </label>
       </section>
 
@@ -39,24 +43,37 @@
           <option value="all">Loading routes…</option>
         </select>
 
-        <label for="aadt">Minimum AADT</label>
+        <label for="aadt">Minimum total AADT</label>
         <input id="aadt" type="range" min="0" max="200000" step="5000" value="0" disabled>
         <div class="range-value"><span id="aadt-value">0</span> vehicles/day minimum</div>
+
+        <label for="truck-pct">Minimum truck share</label>
+        <input id="truck-pct" type="range" min="0" max="40" step="1" value="0" disabled>
+        <div class="range-value"><span id="truck-pct-value">0</span>% minimum</div>
+
         <div id="visible-count" class="range-value"></div>
       </section>
 
       <section class="legend">
-        <h2>AADT</h2>
+        <h2>Total AADT</h2>
         <div><span class="dot dot-low"></span> Under 25,000</div>
         <div><span class="dot dot-med"></span> 25,000–75,000</div>
         <div><span class="dot dot-high"></span> 75,000–150,000</div>
         <div><span class="dot dot-very-high"></span> 150,000+</div>
       </section>
 
+      <section class="legend">
+        <h2>Truck share</h2>
+        <div><span class="dot truck-low"></span> Under 5%</div>
+        <div><span class="dot truck-med"></span> 5–10%</div>
+        <div><span class="dot truck-high"></span> 10–20%</div>
+        <div><span class="dot truck-very-high"></span> 20%+</div>
+      </section>
+
       <section class="status">
         <h2>Status</h2>
-        <p><strong>Version 0.3</strong></p>
-        <p id="status-message">Loading 2024 Caltrans AADT data…</p>
+        <p><strong>Version 0.4</strong></p>
+        <p id="status-message">Loading 2024 Caltrans traffic data…</p>
       </section>
     </aside>
 
