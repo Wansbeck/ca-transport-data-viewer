@@ -34,6 +34,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
           git add data/services-osm.geojson data/services-osm-meta.json
           if git diff --cached --quiet; then
             echo "No service data changes to commit."
