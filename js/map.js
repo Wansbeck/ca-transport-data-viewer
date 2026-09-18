@@ -197,6 +197,8 @@ function servicePopup(p) {
       <span>Toilets</span><strong>${p.TOILETS || '—'}</strong>
       <span>Showers</span><strong>${p.SHOWER || '—'}</strong>
       <span>Hours</span><strong>${p.OPENING_HOURS || '—'}</strong>
+      <span>Competition quality</span><strong>${p.QUALITY_TIER || '—'}</strong>
+      <span>Competition strength</span><strong>${p.COMPETITION_STRENGTH == null ? '—' : Number(p.COMPETITION_STRENGTH).toFixed(1)}</strong>
     </div>
     <div class="source-note" style="margin:10px 0 0 0">OpenStreetMap record; completeness and tagging vary.</div>`;
 }
@@ -494,15 +496,19 @@ document.getElementById('context-metric').addEventListener('change', updateConte
  + Number(p.MEDIAN_HH_INCOME).toLocaleString('en-US')}</strong>
       <span>Population density</span><strong>${p.POP_DENSITY_SQMI == null ? '—' : Number(p.POP_DENSITY_SQMI).toLocaleString('en-US') + '/sq mi'}</strong>
       <span>Nearby truck share</span><strong>${p.TRUCK_PERCENT_NEARBY == null ? '—' : Number(p.TRUCK_PERCENT_NEARBY).toFixed(1) + '%'}</strong>
-      <span>Total-traffic score</span><strong>${Number(p.AADT_SCORE || 0).toFixed(1)} / 35</strong>
-      <span>Service-distance score</span><strong>${Number(p.SERVICE_DISTANCE_SCORE || 0).toFixed(1)} / 20</strong>
+      <span>Nearest interchange</span><strong>${p.NEAREST_INTERCHANGE_MI == null ? '—' : Number(p.NEAREST_INTERCHANGE_MI).toFixed(1) + ' mi'}</strong>
+      <span>Traveller intensity</span><strong>${p.TRAVELLER_INTENSITY == null ? '—' : Number(p.TRAVELLER_INTENSITY).toFixed(0)}</strong>
+      <span>Total-traffic score</span><strong>${Number(p.AADT_SCORE || 0).toFixed(1)} / 30</strong>
+      <span>Service-distance score</span><strong>${Number(p.SERVICE_DISTANCE_SCORE || 0).toFixed(1)} / 15</strong>
       <span>Competition score</span><strong>${Number(p.COMPETITION_SCORE || 0).toFixed(1)} / 15</strong>
-      <span>Income score</span><strong>${Number(p.INCOME_SCORE || 0).toFixed(1)} / 12</strong>
-      <span>Density score</span><strong>${Number(p.DENSITY_SCORE || 0).toFixed(1)} / 8</strong>
-      <span>Truck contribution</span><strong>${Number(p.TRUCK_SCORE || 0).toFixed(1)} / 10</strong>
+      <span>Traveller-demand score</span><strong>${Number(p.TRAVELLER_SCORE || 0).toFixed(1)} / 10</strong>
+      <span>Accessibility score</span><strong>${Number(p.ACCESS_SCORE || 0).toFixed(1)} / 10</strong>
+      <span>Income score</span><strong>${Number(p.INCOME_SCORE || 0).toFixed(1)} / 10</strong>
+      <span>Density score</span><strong>${Number(p.DENSITY_SCORE || 0).toFixed(1)} / 5</strong>
+      <span>Truck contribution</span><strong>${Number(p.TRUCK_SCORE || 0).toFixed(1)} / 5</strong>
     </div>
     <div class="source-note" style="margin:10px 0 0 0">
-      First-pass screening model. Service distance is straight-line, not routed highway distance. Land availability, access, tourism, entitlement and site economics are not yet included.
+      Screening model v0.2. Service and interchange distances are straight-line proxies. Tourism demand is inferred from mapped attractions/lodging and corridor function. Parcel-level land, access, entitlement and site economics are not yet included.
     </div>`;
 }
 
