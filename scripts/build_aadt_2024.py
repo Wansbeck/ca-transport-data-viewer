@@ -57,9 +57,9 @@ def find_sheet_and_header(path):
         for i, row in preview.iterrows():
             vals = [clean_name(x) for x in row.tolist()]
             joined = " ".join(vals)
-            has_route = "route" in joined or re.search(r"(^|_)rte($|_)", joined) is not None
-            has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined) or re.search(r"(^|_)pm($|_)", joined) is not None
-            has_county = "county" in joined or "cnty" in joined or re.search(r"(^|_)co($|_)", joined) is not None
+            has_route = "route" in joined or "rte" in vals
+            has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined) or "pm" in vals
+            has_county = "county" in joined or "cnty" in vals or "co" in vals
             if has_route and has_postmile and has_county:
                 print(f"Using sheet {sheet!r}, header row {i}")
                 return sheet, i
