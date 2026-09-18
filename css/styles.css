@@ -228,3 +228,9 @@ select {
     flex: 0 0 20px;
   }
 }
+
+
+.opp-excluded { background: #4d4d4d; }
+.srra-dot { background: #006837; }
+.urban-major { background: #756bb1; }
+.urban-other { background: #9ecae1; }
