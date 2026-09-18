@@ -57,9 +57,9 @@ def find_sheet_and_header(path):
         for i, row in preview.iterrows():
             vals = [clean_name(x) for x in row.tolist()]
             joined = " ".join(vals)
-            has_route = "route" in joined
-            has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined)
-            has_county = "county" in joined or re.search(r"(^|_)co($|_)", joined) is not None
+            has_route = "route" in joined or re.search(r"(^|_)rte($|_)", joined) is not None
+            has_postmile = "postmile" in joined or "post_mile" in joined or ("post" in joined and "mile" in joined) or re.search(r"(^|_)pm($|_)", joined) is not None
+            has_county = "county" in joined or "cnty" in joined or re.search(r"(^|_)co($|_)", joined) is not None
             if has_route and has_postmile and has_county:
                 print(f"Using sheet {sheet!r}, header row {i}")
                 return sheet, i
@@ -119,14 +119,15 @@ def main():
     df = df.dropna(how="all")
     print("Workbook columns:", list(df.columns))
 
-    route_col = find_col(df.columns, ("route",))
-    county_col = find_col(df.columns, ("county",))
-    pm_col = find_col(df.columns, ("postmile",)) or find_col(df.columns, ("post", "mile"))
-    desc_col = find_col(df.columns, ("description",))
-    back_aadt_col = find_col(df.columns, ("back", "aadt"))
-    ahead_aadt_col = find_col(df.columns, ("ahead", "aadt"))
-    back_peak_col = find_col(df.columns, ("back", "peak", "hour"))
-    ahead_peak_col = find_col(df.columns, ("ahead", "peak", "hour"))
+    norm_cols = {clean_name(col): col for col in df.columns}
+    route_col = norm_cols.get("rte") or find_col(df.columns, ("route",))
+    county_col = norm_cols.get("cnty") or norm_cols.get("co") or find_col(df.columns, ("county",))
+    pm_col = norm_cols.get("pm") or find_col(df.columns, ("postmile",)) or find_col(df.columns, ("post", "mile"))
+    desc_col = norm_cols.get("description") or find_col(df.columns, ("description",))
+    back_aadt_col = norm_cols.get("back_aadt") or find_col(df.columns, ("back", "aadt"))
+    ahead_aadt_col = norm_cols.get("ahead_aadt") or find_col(df.columns, ("ahead", "aadt"))
+    back_peak_col = norm_cols.get("back_peak_hour") or find_col(df.columns, ("back", "peak", "hour"))
+    ahead_peak_col = norm_cols.get("ahead_peak_hour") or find_col(df.columns, ("ahead", "peak", "hour"))
 
     required = {
         "route": route_col,
