@@ -14,6 +14,8 @@ on:
       - "data/acs-2024-tract-context.geojson"
       - "data/services-osm.geojson"
       - "data/traveller-context-osm.geojson"
+      - "data/urban-areas-2020.geojson"
+      - "data/caltrans-srra.geojson"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,6 +31,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - run: git pull --rebase origin main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -36,8 +39,8 @@ jobs:
         run: pip install geopandas scipy
       - name: Build opportunity layer
         run: |
-          if [ ! -f data/services-osm.geojson ] || [ ! -f data/traveller-context-osm.geojson ]; then
-            echo "Upstream service/traveller datasets are not available yet; opportunity build will run after they are committed."
+          if [ ! -f data/services-osm.geojson ] || [ ! -f data/traveller-context-osm.geojson ] || [ ! -f data/urban-areas-2020.geojson ] || [ ! -f data/caltrans-srra.geojson ]; then
+            echo "Required upstream datasets are not available yet."
             exit 0
           fi
           python scripts/build_opportunity_2024.py
@@ -54,6 +57,5 @@ jobs:
             echo "No opportunity data changes to commit."
           else
             git commit -m "Refresh corridor opportunity scores"
-            git pull --rebase origin main
             git push origin HEAD:main
           fi
