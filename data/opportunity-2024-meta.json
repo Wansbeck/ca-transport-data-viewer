@@ -1,0 +1,51 @@
+{
+  "generated_at_utc": "2026-09-19T00:17:49.073167+00:00",
+  "model_version": "0.3",
+  "feature_count": 14663,
+  "excluded_urban_core_segments": 4215,
+  "weights": {
+    "traveller_long_distance": 25.0,
+    "service_gap": 20.0,
+    "competition_quality": 15.0,
+    "total_aadt": 15.0,
+    "accessibility": 10.0,
+    "tourism": 5.0,
+    "household_income": 5.0,
+    "truck_share": 5.0
+  },
+  "long_distance_share_assumptions": {
+    "5": 0.55,
+    "8": 0.4,
+    "10": 0.45,
+    "15": 0.5,
+    "40": 0.6,
+    "80": 0.5,
+    "101": 0.35,
+    "99": 0.25,
+    "50": 0.35,
+    "58": 0.45,
+    "395": 0.5,
+    "1": 0.45
+  },
+  "default_long_distance_share": 0.15,
+  "urban_rule": {
+    "excluded": "Inside a Census major urban area (2020 population >=100,000) and local ACS tract density >=2,500/sq mi",
+    "major_urban_fringe_multiplier": 0.65,
+    "small_urban_or_low_density_fringe_multiplier": 0.85
+  },
+  "limitations": [
+    "Screening model, not a site recommendation.",
+    "Long-distance shares are explicit modelling assumptions, not observed trip-purpose data.",
+    "Service, SRRA and interchange distances are straight-line screening proxies, not routed highway distance.",
+    "Census urban-area and ACS-density rules approximate urban suitability; parcel-level context may differ.",
+    "Tourism demand uses mapped attraction/lodging concentration rather than measured visitation.",
+    "Land availability, parcel access, visibility, entitlement, utilities, environmental constraints and land economics are not yet included."
+  ],
+  "score_summary": {
+    "min": 0.0,
+    "median": 17.3,
+    "p75": 26.7,
+    "p90": 36.7,
+    "max": 69.4
+  }
+}
