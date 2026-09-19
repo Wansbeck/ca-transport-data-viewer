@@ -72,7 +72,7 @@ async function dataFileExists(path) {
 async function refreshOptionalLayerAvailability() {
   const ids = [
     ['service-layer', 'data/services-osm.geojson'],
-    ['opportunity-layer', 'data/opportunity-2024.geojson'],
+    ['opportunity-layer', 'data/opportunity-2024-lite.geojson'],
     ['srra-layer', 'data/caltrans-srra.geojson'],
     ['urban-layer', 'data/urban-areas-2020.geojson']
   ];
@@ -229,7 +229,7 @@ function opportunityPopup(p) {
     '<span>Tourism score</span><strong>' + Number(p.TOURISM_SCORE || 0).toFixed(1) + ' / 5</strong>' +
     '<span>Income score</span><strong>' + Number(p.INCOME_SCORE || 0).toFixed(1) + ' / 5</strong>' +
     '<span>Truck score</span><strong>' + Number(p.TRUCK_SCORE || 0).toFixed(1) + ' / 5</strong></div>' +
-    '<div class="source-note" style="margin:10px 0 0 0">Model v0.3. Long-distance shares are screening assumptions, not measured trip-purpose data. Dense major-urban cores are categorically excluded.</div>';
+    '<div class="source-note" style="margin:10px 0 0 0">Model v0.4. Long-distance shares are screening assumptions, not measured trip-purpose data. Dense major-urban cores are categorically excluded.</div>';
 }
 
 function srraPopup(p) {
@@ -327,7 +327,7 @@ async function ensureServiceLayer() {
 
 async function ensureOpportunityLayer() {
   if (opportunityLoaded) return;
-  const data = await loadGeoJson('data/opportunity-2024.geojson');
+  const data = await loadGeoJson('data/opportunity-2024-lite.geojson');
   opportunityFeatures = data.features || [];
   map.addSource('opportunity', { type: 'geojson', data });
   map.addLayer({
@@ -432,6 +432,12 @@ map.on('load', async () => {
     updateFilters();
     await refreshOptionalLayerAvailability();
     status.textContent = segmentFeatures.length.toLocaleString('en-US') + ' traffic segments loaded.';
+
+    // Preload the opportunity display layer in the background. It remains
+    // invisible until the user checks the box, but toggling is then immediate.
+    ensureOpportunityLayer().catch(error => {
+      console.warn('Opportunity layer preload failed:', error);
+    });
   } catch (error) {
     console.error(error);
     status.textContent = 'The Caltrans traffic data could not be loaded. The base map is still available.';
