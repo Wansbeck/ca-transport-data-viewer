@@ -341,7 +341,6 @@ async function ensureOpportunityLayer() {
     }
   });
   bindLayerPopup('opportunity-segments', opportunityPopup);
-  document.getElementById('opportunity-score').disabled = false;
   updateFilters();
   opportunityLoaded = true;
 }
