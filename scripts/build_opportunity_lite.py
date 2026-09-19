@@ -34,9 +34,22 @@ def main():
     gdf = gpd.read_file(SRC).to_crs(4326)
 
     # Simplify in a California projected CRS so tolerance is in metres.
+    # Excluded dense urban-core features are never rendered by the map, so do
+    # not ship them to the browser.
+    if "URBAN_EXCLUDED" in gdf.columns:
+        gdf = gdf[~gdf["URBAN_EXCLUDED"].fillna(False).astype(bool)].copy()
+
     projected = gdf.to_crs(3310)
-    projected["geometry"] = projected.geometry.simplify(100, preserve_topology=True)
+    projected["geometry"] = projected.geometry.simplify(125, preserve_topology=True)
     lite = projected.to_crs(4326)
+
+    # Snap coordinates to roughly 10 m precision. This is more than adequate
+    # for statewide corridor screening and greatly reduces GeoJSON size.
+    try:
+        from shapely import set_precision
+        lite["geometry"] = lite.geometry.apply(lambda g: set_precision(g, 0.0001))
+    except Exception:
+        pass
 
     cols = [c for c in KEEP if c in lite.columns] + ["geometry"]
     lite = lite[cols]
@@ -58,7 +71,8 @@ def main():
     meta = {
         "source":"data/opportunity-2024.geojson",
         "feature_count":len(features),
-        "simplification_tolerance_m":100,
+        "simplification_tolerance_m":125,
+        "excluded_features_omitted":True,
         "output_bytes":OUT.stat().st_size,
         "source_bytes":SRC.stat().st_size,
     }
