@@ -336,7 +336,7 @@ async function ensureOpportunityLayer() {
     paint: {
       'line-color': ['step', ['get', 'OPPORTUNITY_SCORE'],
         '#bdbdbd', 50, '#fed976', 65, '#fd8d3c', 80, '#bd0026'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 4, 3.2, 8, 6, 12, 9],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 4, 4.5, 8, 7.5, 12, 11],
       'line-opacity': 0.92
     }
   });
@@ -460,18 +460,35 @@ document.getElementById('opportunity-layer').addEventListener('change', async e 
     if (e.target.checked) {
       status.textContent = 'Loading corridor opportunity scores…';
       await ensureOpportunityLayer();
+
+      // Make the opportunity layer visually unambiguous by hiding the
+      // ordinary AADT line layer while opportunity scoring is displayed.
+      if (map.getLayer('traffic-segments')) {
+        map.setLayoutProperty('traffic-segments', 'visibility', 'none');
+        const segmentToggle = document.getElementById('segment-layer');
+        if (segmentToggle) segmentToggle.checked = false;
+      }
+
       map.setLayoutProperty('opportunity-segments', 'visibility', 'visible');
       updateFilters();
+
       const minScore = Number(document.getElementById('opportunity-score').value);
       const visible = opportunityFeatures.filter(f =>
-        num(f.properties.OPPORTUNITY_SCORE) >= minScore && !f.properties.URBAN_EXCLUDED
+        num(f.properties.OPPORTUNITY_SCORE) >= minScore &&
+        !(f.properties.URBAN_EXCLUDED === true || f.properties.URBAN_EXCLUDED === 'true')
       ).length;
-      status.textContent = visible.toLocaleString('en-US') + ' non-excluded corridor segments score ' + minScore + '+.';
+
+      status.textContent =
+        visible.toLocaleString('en-US') +
+        ' non-excluded corridor segments score ' +
+        minScore +
+        '+. Lower the threshold to see more corridors.';
     } else if (opportunityLoaded) {
       map.setLayoutProperty('opportunity-segments', 'visibility', 'none');
     }
   } catch (error) {
-    console.error(error); e.target.checked = false;
+    console.error(error);
+    e.target.checked = false;
     status.textContent = 'Opportunity scores are not available yet.';
   }
 });
