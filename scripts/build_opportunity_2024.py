@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Build trigger: upstream datasets ready
 """Build corridor opportunity screening scores for destination-style highway services."""
 
 from __future__ import annotations
