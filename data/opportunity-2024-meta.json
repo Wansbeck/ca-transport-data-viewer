@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-09-19T00:17:49.073167+00:00",
-  "model_version": "0.3",
+  "generated_at_utc": "2026-09-19T13:04:16.222129+00:00",
+  "model_version": "0.4",
   "feature_count": 14663,
-  "excluded_urban_core_segments": 4215,
+  "excluded_urban_core_segments": 2807,
   "weights": {
     "traveller_long_distance": 25.0,
     "service_gap": 20.0,
@@ -29,9 +29,9 @@
   },
   "default_long_distance_share": 0.15,
   "urban_rule": {
-    "excluded": "Inside a Census major urban area (2020 population >=100,000) and local ACS tract density >=2,500/sq mi",
-    "major_urban_fringe_multiplier": 0.65,
-    "small_urban_or_low_density_fringe_multiplier": 0.85
+    "excluded": "Inside a Census major urban area (2020 population >=100,000) and local ACS tract density >=5,000/sq mi",
+    "major_urban_fringe_multiplier": 0.8,
+    "small_urban_or_low_density_fringe_multiplier": 0.95
   },
   "limitations": [
     "Screening model, not a site recommendation.",
@@ -43,9 +43,9 @@
   ],
   "score_summary": {
     "min": 0.0,
-    "median": 17.3,
-    "p75": 26.7,
-    "p90": 36.7,
+    "median": 20.6,
+    "p75": 31.6,
+    "p90": 41.8,
     "max": 69.4
   }
 }
