@@ -1,0 +1,7 @@
+{
+  "source": "data/opportunity-2024.geojson",
+  "feature_count": 14663,
+  "simplification_tolerance_m": 100,
+  "output_bytes": 11983463,
+  "source_bytes": 12564899
+}
