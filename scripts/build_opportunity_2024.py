@@ -162,6 +162,11 @@ def urban_class(urban_row,density):
 
 def main():
     seg=gpd.read_file(SEGMENTS).to_crs(4326)
+    # The source segment geometry is very detailed. Simplify to ~75 metres for
+    # web display so the opportunity layer loads quickly in-browser while
+    # preserving corridor shape at statewide/regional viewing scales.
+    simplified_geom=seg.to_crs(3310).geometry.simplify(75,preserve_topology=True)
+    simplified_geom=gpd.GeoSeries(simplified_geom,crs=3310).to_crs(4326)
     trucks=gpd.read_file(TRUCKS).to_crs(4326)
     acs=gpd.read_file(ACS).to_crs(4326)
     services=gpd.read_file(SERVICES).to_crs(4326)
@@ -210,15 +215,29 @@ def main():
         if aadt<8000 and not is_excluded: score=min(score,40.0)
         if is_excluded: excluded+=1
 
-        p=dict(s.drop(labels=["geometry"],errors="ignore"))
-        p.update({
-            "OPPORTUNITY_SCORE":score,"RAW_SCORE":round(raw,1),
-            "URBAN_STATUS":ustatus,"URBAN_MULTIPLIER":umult,"URBAN_EXCLUDED":is_excluded,
-            "LONG_DISTANCE_SHARE":share,"ADDRESSABLE_AADT":round(addressable),
-            "LONG_DISTANCE_SCORE":round(long_score,1),"AADT_SCORE":round(aadt_score,1),
-            "SERVICE_GAP_SCORE":round(gap_score,1),"COMPETITION_SCORE":round(comp_score,1),
-            "ACCESS_SCORE":round(access_score,1),"TOURISM_SCORE":round(tourism_score,1),
-            "INCOME_SCORE":round(income_score,1),"TRUCK_SCORE":round(truck_score,1),
+        # Keep only fields required by the web map. The detailed source
+        # segment attributes remain available in the underlying AADT layer.
+        p={
+            "RTE":str(s.get("RTE") or ""),
+            "CNTY":s.get("CNTY"),
+            "START_PM":s.get("START_PM"),
+            "END_PM":s.get("END_PM"),
+            "AADT":round(aadt),
+            "OPPORTUNITY_SCORE":score,
+            "RAW_SCORE":round(raw,1),
+            "URBAN_STATUS":ustatus,
+            "URBAN_MULTIPLIER":umult,
+            "URBAN_EXCLUDED":is_excluded,
+            "LONG_DISTANCE_SHARE":share,
+            "ADDRESSABLE_AADT":round(addressable),
+            "LONG_DISTANCE_SCORE":round(long_score,1),
+            "AADT_SCORE":round(aadt_score,1),
+            "SERVICE_GAP_SCORE":round(gap_score,1),
+            "COMPETITION_SCORE":round(comp_score,1),
+            "ACCESS_SCORE":round(access_score,1),
+            "TOURISM_SCORE":round(tourism_score,1),
+            "INCOME_SCORE":round(income_score,1),
+            "TRUCK_SCORE":round(truck_score,1),
             "TRUCK_PERCENT_NEARBY":None if t_pct is None else round(t_pct,1),
             "MEDIAN_HH_INCOME":None if income is None or not np.isfinite(float(income)) else int(income),
             "POP_DENSITY_SQMI":None if density is None or not np.isfinite(float(density)) else round(float(density),1),
@@ -226,12 +245,10 @@ def main():
             "NEAREST_SRRA_MI":None if nearest_srra is None else round(nearest_srra,1),
             "NEAREST_INTERCHANGE_MI":None if nearest_junction is None else round(nearest_junction,1),
             "TOURISM_INTENSITY":round(tourism_intensity,1),
-            "COMPETITION_WEIGHT_5MI":round(comp5,2),"COMPETITION_WEIGHT_10MI":round(comp10,2),
-            "SERVICE_COUNTS_10MI":json.dumps(counts,separators=(",",":")),
             "MODEL_VERSION":"0.4"
-        })
+        }
         scores.append(score)
-        features.append({"type":"Feature","geometry":s.geometry.__geo_interface__,"properties":p})
+        features.append({"type":"Feature","geometry":simplified_geom.iloc[i].__geo_interface__,"properties":p})
 
     OUT.write_text(json.dumps({"type":"FeatureCollection","features":features},separators=(",",":")),encoding="utf-8")
     meta={
@@ -255,6 +272,8 @@ def main():
     }
     if scores:
         meta["score_summary"]={"min":round(float(np.min(scores)),1),"median":round(float(np.median(scores)),1),"p75":round(float(np.percentile(scores,75)),1),"p90":round(float(np.percentile(scores,90)),1),"max":round(float(np.max(scores)),1)}
+    META.write_text(json.dumps(meta,indent=2),encoding="utf-8")
+    meta["output_bytes"]=OUT.stat().st_size
     META.write_text(json.dumps(meta,indent=2),encoding="utf-8")
     print(json.dumps(meta,indent=2))
 
