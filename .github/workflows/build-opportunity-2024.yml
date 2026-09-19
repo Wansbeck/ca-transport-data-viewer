@@ -52,7 +52,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
           git add data/opportunity-2024.geojson data/opportunity-2024-meta.json
           if git diff --cached --quiet; then
             echo "No opportunity data changes to commit."
