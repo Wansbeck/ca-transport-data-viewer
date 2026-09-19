@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-09-19T13:04:16.222129+00:00",
+  "generated_at_utc": "2026-09-19T13:21:12.569754+00:00",
   "model_version": "0.4",
   "feature_count": 14663,
   "excluded_urban_core_segments": 2807,
@@ -47,5 +47,6 @@
     "p75": 31.6,
     "p90": 41.8,
     "max": 69.4
-  }
+  },
+  "output_bytes": 12564899
 }
