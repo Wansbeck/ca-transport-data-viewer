@@ -154,11 +154,11 @@ def urban_class(urban_row,density):
     major=bool(urban_row.get("MAJOR_URBAN_AREA"))
     try: dens=float(density)
     except (TypeError,ValueError): dens=0
-    if major and dens>=2500:
+    if major and dens>=5000:
         return "excluded_major_urban_core",0.0,True
-    if major and dens>=750:
-        return "major_urban_fringe",0.65,False
-    return "small_urban_or_low_density_fringe",0.85,False
+    if major and dens>=1500:
+        return "major_urban_fringe",0.80,False
+    return "small_urban_or_low_density_fringe",0.95,False
 
 def main():
     seg=gpd.read_file(SEGMENTS).to_crs(4326)
@@ -228,7 +228,7 @@ def main():
             "TOURISM_INTENSITY":round(tourism_intensity,1),
             "COMPETITION_WEIGHT_5MI":round(comp5,2),"COMPETITION_WEIGHT_10MI":round(comp10,2),
             "SERVICE_COUNTS_10MI":json.dumps(counts,separators=(",",":")),
-            "MODEL_VERSION":"0.3"
+            "MODEL_VERSION":"0.4"
         })
         scores.append(score)
         features.append({"type":"Feature","geometry":s.geometry.__geo_interface__,"properties":p})
@@ -236,13 +236,13 @@ def main():
     OUT.write_text(json.dumps({"type":"FeatureCollection","features":features},separators=(",",":")),encoding="utf-8")
     meta={
       "generated_at_utc":datetime.now(timezone.utc).isoformat(),
-      "model_version":"0.3","feature_count":len(features),"excluded_urban_core_segments":excluded,
+      "model_version":"0.4","feature_count":len(features),"excluded_urban_core_segments":excluded,
       "weights":WEIGHTS,"long_distance_share_assumptions":LONG_DISTANCE_SHARE,
       "default_long_distance_share":DEFAULT_LONG_DISTANCE_SHARE,
       "urban_rule":{
-        "excluded":"Inside a Census major urban area (2020 population >=100,000) and local ACS tract density >=2,500/sq mi",
-        "major_urban_fringe_multiplier":0.65,
-        "small_urban_or_low_density_fringe_multiplier":0.85
+        "excluded":"Inside a Census major urban area (2020 population >=100,000) and local ACS tract density >=5,000/sq mi",
+        "major_urban_fringe_multiplier":0.80,
+        "small_urban_or_low_density_fringe_multiplier":0.95
       },
       "limitations":[
         "Screening model, not a site recommendation.",
